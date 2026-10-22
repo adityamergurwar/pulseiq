@@ -1,6 +1,6 @@
 # Local acceptance evidence
 
-Generated: 2026-10-22 10:53
+Generated: 2026-10-22 11:13
 
 ## Repeatable Excel export · 2026-10-22
 
@@ -8,6 +8,10 @@ Generated: 2026-10-22 10:53
 - September headcount (441), employer payroll cost (INR 55,519,621.87), net profit (INR 14,985,979.13) and open receivables (INR 139,394,278) match the source views.
 - The workbook keeps the seeded raw-source findings visible, marks the data-quality gate `REVIEW REQUIRED`, and shows the clean payroll-to-ledger reconciliation as `PASS`.
 - All nine sheets were rendered and visually reviewed. The formula-error scan found zero matches.
+
+## Automated tests · 2026-10-22
+
+- All 8 tests passed, including the regression for Streamlit-hosted secrets and environment-variable precedence.
 
 ## Pipeline and warehouse
 

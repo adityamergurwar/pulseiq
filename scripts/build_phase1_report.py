@@ -60,10 +60,10 @@ def build():
     ]
     meta = [
         ["Author", "Aditya Mergurwar", "Data cutoff", "30 Sep 2026"],
-        ["Repository", "Local workspace; no GitHub remote", "Phase tag", "Not published"],
+        ["Repository", "Private GitHub: main published", "Phase tag", "phase-1 at 965d9f6"],
     ]
-    story.append(make_table(meta, [22 * mm, 67 * mm, 23 * mm, 50 * mm], header=False, font_size=8))
-    story += [Spacer(1, 5), Paragraph("Phase 1 built a validated local warehouse, a 28-metric governed layer, and the first workforce dashboard. This report records verified evidence from the local project; the public repository and programme submission are not yet available.", styles["Callout"])]
+    story.append(make_table(meta, [22 * mm, 67 * mm, 23 * mm, 50 * mm], header=False, font_size=7.6))
+    story += [Spacer(1, 5), Paragraph("Phase 1 built a validated local warehouse, a 28-metric governed layer, and the first workforce dashboard. The private GitHub repository and phase tag are published. Public hosting and programme submission still need the account and owner actions listed on page 2.", styles["Callout"])]
     story.append(Paragraph("Five task outcomes", styles["SectionCustom"]))
     tasks = [
         ["Task", "Result", "Evidence"],
@@ -77,7 +77,7 @@ def build():
     story.append(Paragraph("Validation evidence", styles["SectionCustom"]))
     checks = [
         ["Check", "Result"],
-        ["Automated tests", "6 passed, including the headcount prior-period binding regression."],
+        ["Automated tests", "8 passed, including headcount, monthly Excel export and host-secret configuration regressions."],
         ["Rerun safety", "Two full ETL refreshes produced identical row counts and business snapshots."],
         ["Metric layer", "28 of 28 governed metric views return rows; M28 error is null because actuals and forecasts do not overlap."],
         ["Payroll reconciliation", "18 of 18 reference months match; maximum clean payroll-to-ledger difference INR 0.00000004 (tolerance INR 0.01)."],
@@ -113,7 +113,7 @@ def build():
     story.append(Paragraph("Problems and fixes", styles["SectionCustom"]))
     story.append(Paragraph("The workforce page raised a DuckDB invalid-input error because the prior-month query had three placeholders but received two values. The department filter is now bound twice and the selected period once, with a regression test for company and department scopes. Seeded payroll, attendance, task, invoice, leave, expense, attrition-risk and SCD issues remain in raw evidence and are documented with their clean-layer handling.", styles["BodyCustom"]))
     story.append(Paragraph("Next phase and submission", styles["SectionCustom"]))
-    story.append(Paragraph("Local implementation covers the project playbook. Still required for formal submission: connect the GitHub remote, create and publish the phase tag, confirm the personal learning statement, deploy with production secrets, add fobesitech as a collaborator, verify the live link on a phone, record the five-minute demo and upload the PDF.", styles["BodyCustom"]))
+    story.append(Paragraph("The private GitHub main branch is published with the latest deployment readiness update; the phase-1 tag remains pinned to release commit 965d9f6. Still required for formal submission: deploy with production secrets, review the seeded raw-data findings, provide a changing source feed before scheduling refreshes, add fobesitech as a collaborator, verify the live link on a phone, record the five-minute demo, confirm the personal learning reflection and upload the required files.", styles["BodyCustom"]))
     story.append(Paragraph("Source: supplied fictional PulseIQ data, validation vault and project playbook. Detailed results are in docs/validation_results.md and docs/task_acceptance_matrix.md.", styles["Note"]))
 
     def footer(canvas, document):

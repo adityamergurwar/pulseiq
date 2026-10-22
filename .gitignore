@@ -2,6 +2,7 @@ __pycache__/
 .venv/
 .artifact_build/
 .chart-data-*/
+.streamlit/secrets.toml
 *.py[cod]
 *.duckdb
 *.wal

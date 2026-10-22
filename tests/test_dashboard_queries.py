@@ -1,10 +1,21 @@
 import unittest
 from datetime import date
+from unittest.mock import patch
 
-from pulseiq.app_common import prior_month_headcount, query_df
+import streamlit as st
+
+from pulseiq.app_common import config_value, prior_month_headcount, query_df
 
 
 class DashboardQueryTests(unittest.TestCase):
+    def test_config_value_reads_streamlit_secrets_and_environment_takes_precedence(self):
+        with patch.dict("os.environ", {}, clear=True), patch.object(st, "secrets", {"PULSEIQ_REQUIRE_LOGIN": "1"}):
+            self.assertEqual(config_value("PULSEIQ_REQUIRE_LOGIN", "0"), "1")
+            self.assertEqual(config_value("MISSING_SETTING", "fallback"), "fallback")
+
+        with patch.dict("os.environ", {"PULSEIQ_REQUIRE_LOGIN": "0"}), patch.object(st, "secrets", {"PULSEIQ_REQUIRE_LOGIN": "1"}):
+            self.assertEqual(config_value("PULSEIQ_REQUIRE_LOGIN", "1"), "0")
+
     def test_prior_month_headcount_binds_both_department_filters(self):
         latest = query_df("SELECT MAX(period) FROM metrics.m01_headcount").iloc[0, 0]
         self.assertIsNotNone(latest)

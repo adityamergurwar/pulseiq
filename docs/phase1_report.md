@@ -3,8 +3,8 @@
 **Name:** Aditya Mergurwar
 **Track:** Data Analytics · Aura Workforce by Growmar  
 **Phase:** 1 · Foundation  
-**Repository:** [Private `pulseiq` repository](https://github.com/adityamergurwar/pulseiq); code push pending
-**Git tag:** Local `phase-1` tag marks the final release commit; pushing the branch and tag is pending.
+**Repository:** [Private `pulseiq` repository](https://github.com/adityamergurwar/pulseiq); `main` published with Streamlit secrets support
+**Git tag:** Annotated `phase-1` tag is published at release commit `965d9f6`.
 
 ## Five-task evidence
 
@@ -18,7 +18,7 @@
 
 ## Proof it works
 
-The local test suite has 7 passing tests. Two consecutive ETL runs produced the same business snapshot: 29 source tables, 62,770 input rows, 62,742 passing rows, 28 quarantined rows, zero declared orphans and 28 metric views. The acceptance script independently checks all 28 metric views, five hand calculations, the 18-month PQ-09 answer key and the privacy-safe PQ-13 reference. The maximum clean payroll-to-ledger difference is INR 0.00000004, inside the INR 0.01 tolerance. All 18 declared one-person D00 department-months are suppressed from the PQ-13 output.
+The local test suite has 8 passing tests. Two consecutive ETL runs produced the same business snapshot: 29 source tables, 62,770 input rows, 62,742 passing rows, 28 quarantined rows, zero declared orphans and 28 metric views. The acceptance script independently checks all 28 metric views, five hand calculations, the 18-month PQ-09 answer key and the privacy-safe PQ-13 reference. The maximum clean payroll-to-ledger difference is INR 0.00000004, inside the INR 0.01 tolerance. All 18 declared one-person D00 department-months are suppressed from the PQ-13 output.
 
 The ETL preserves source rows. The current training data contains known issues, so raw DQ results include critical failures and warnings. The corresponding corrections and quarantine decisions are shown in `docs/data_quality.md` and `docs/validation_results.md`; the data-quality page continues to show `REVIEW REQUIRED` until an owner reviews those findings.
 
@@ -52,4 +52,4 @@ The implementation shows how preserving source rows and quarantining invalid row
 
 ## Next phase and submission
 
-The local project implements all 20 playbook modules, with hosted work and owner actions tracked in the acceptance matrix. The private repository push and phase tag are pending. Public deployment, hosted refresh, `fobesitech` collaborator, live phone test, recorded five-minute demo and programme upload still need to be completed before submission.
+The local project implements all 20 playbook modules, with hosted work and owner actions tracked in the acceptance matrix. The private repository and phase tag are published. Public deployment and production secrets, a changing source feed and hosted refresh, review of seeded raw-data findings, `fobesitech` collaborator, live phone test, recorded five-minute demo, owner-confirmed learning reflection and programme upload still need to be completed before submission.

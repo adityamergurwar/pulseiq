@@ -18,6 +18,18 @@ DB_PATH = Path(os.environ.get("PULSEIQ_DB_PATH", ROOT / "pulseiq.duckdb"))
 DEMO_USERS = ROOT / "05_Starter" / "demo_users.csv"
 
 
+def config_value(name: str, default: Any = None) -> Any:
+    """Read configuration from environment variables or Streamlit-hosted secrets."""
+    value = os.environ.get(name)
+    if value is not None:
+        return value
+    try:
+        return st.secrets.get(name, default)
+    except Exception:
+        # st.secrets raises when no secrets file or hosted secret store is configured.
+        return default
+
+
 def query_df(sql: str, params: list[Any] | None = None) -> pd.DataFrame:
     if not DB_PATH.exists():
         return pd.DataFrame()
@@ -61,7 +73,7 @@ def ensure_database() -> bool:
 
 
 def _production_user() -> dict[str, Any] | None:
-    credentials = os.environ.get("PULSEIQ_USERS_JSON", "")
+    credentials = str(config_value("PULSEIQ_USERS_JSON", ""))
     if not credentials:
         st.error("Login is required, but PULSEIQ_USERS_JSON is not configured. Add it through the hosting secret manager.")
         return None
@@ -100,7 +112,7 @@ def _production_user() -> dict[str, Any] | None:
 def require_user() -> dict[str, Any]:
     """Resolve a protected user or an explicitly labelled local demo persona."""
     st.sidebar.markdown("### Access")
-    if os.environ.get("PULSEIQ_REQUIRE_LOGIN", "0").strip() == "1":
+    if str(config_value("PULSEIQ_REQUIRE_LOGIN", "0")).strip() == "1":
         user = _production_user()
         if not user:
             st.stop()
@@ -115,10 +127,10 @@ def require_user() -> dict[str, Any]:
     # The starter file describes roles but does not map real identities to teams.
     # These synthetic scopes demonstrate the policy only and are not authentication.
     if role == "HR":
-        scope = {"department_id": os.environ.get("PULSEIQ_DEMO_HR_DEPARTMENT", "D01"), "team_id": None}
+        scope = {"department_id": config_value("PULSEIQ_DEMO_HR_DEPARTMENT", "D01"), "team_id": None}
     elif role == "MANAGER":
-        scope = {"department_id": os.environ.get("PULSEIQ_DEMO_MANAGER_DEPARTMENT", "D01"),
-                 "team_id": os.environ.get("PULSEIQ_DEMO_MANAGER_TEAM", "T01")}
+        scope = {"department_id": config_value("PULSEIQ_DEMO_MANAGER_DEPARTMENT", "D01"),
+                 "team_id": config_value("PULSEIQ_DEMO_MANAGER_TEAM", "T01")}
     else:
         scope = {"department_id": None, "team_id": None}
     user = {"username": chosen, "role": role, **scope, "is_authenticated": False}

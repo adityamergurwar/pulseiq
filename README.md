@@ -37,7 +37,7 @@ The OpenAPI UI is at `http://127.0.0.1:8000/docs`. The API exposes M01, M04, M09
 
 The Streamlit app includes workforce, attendance and leave, attrition, team productivity, payroll and cost, budget and KPI targets, P&L and expenses, receivables and cash, department impact, forecasts and anomalies, executive scorecard, KPI builder, and data quality and lineage.
 
-The local demo persona selector is a role simulation, not authentication. For a hosted deployment set `PULSEIQ_REQUIRE_LOGIN=1` and provide password hashes through the host secret `PULSEIQ_USERS_JSON`. See [deployment notes](docs/deployment.md); never commit secrets.
+The local demo persona selector is a role simulation, not authentication. For a hosted deployment set `PULSEIQ_REQUIRE_LOGIN=1` and provide password hashes through `PULSEIQ_USERS_JSON` in the host environment or Streamlit secrets. See [deployment notes](docs/deployment.md); never commit secrets. `.streamlit/secrets.toml` is ignored by Git.
 
 ## Data and metric contracts
 
@@ -87,4 +87,4 @@ Both packs default to the latest observed workforce month when `--month` is omit
 
 ## Release status
 
-The project runs locally and the local acceptance checks pass. The requested private [pulseiq repository](https://github.com/adityamergurwar/pulseiq) is configured as the remote; the branch and `phase-1` tag still need to be pushed. There is no public dashboard URL, hosted refresh schedule, or recorded demo yet. Public release also requires an owner to review the seeded raw-data findings and configure production login secrets. The exact items still needing the project owner's account or personal input are listed in the acceptance matrix.
+The local acceptance checks pass. The private [pulseiq repository](https://github.com/adityamergurwar/pulseiq) has a published `main` branch and annotated `phase-1` tag; the tag marks commit `965d9f6`. The current `main` also includes a follow-up that supports secrets from Streamlit Community Cloud. A public dashboard URL, production login secrets, incoming source feed and hosted refresh schedule, owner review of the seeded raw-data findings, live phone test, recorded demo, collaborator access, personal learning reflection, and programme upload are still outstanding. The acceptance matrix lists these remaining account and owner actions.

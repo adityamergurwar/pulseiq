@@ -1,5 +1,12 @@
 # PulseIQ release notes
 
+## 2026-10-22 · GitHub release published
+
+- Published the private `main` branch and annotated `phase-1` tag to [adityamergurwar/pulseiq](https://github.com/adityamergurwar/pulseiq).
+- At initial publication, verified that the branch and peeled tag both resolved to commit `965d9f6`; the tag remains pinned there.
+- Updated the deployment runbook, acceptance matrix, README and Phase 1 report to reflect the published release and the remaining hosted and owner actions.
+- Added Streamlit-hosted secret lookup alongside environment variables on current `main`; all 8 automated tests and the local acceptance reconciliation pass.
+
 ## 2026-10-22 · Repeatable monthly workbook
 
 - Added `scripts/build_monthly_excel.py` to generate the nine-sheet monthly Excel pack directly from governed metric, dashboard and audit views.
