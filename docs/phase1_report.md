@@ -4,7 +4,7 @@
 **Track:** Data Analytics · Aura Workforce by Growmar  
 **Phase:** 1 · Foundation  
 **Repository:** [Private `pulseiq` repository](https://github.com/adityamergurwar/pulseiq); code push pending
-**Git tag:** `phase-1` will mark the final release commit; tag creation and push are pending.
+**Git tag:** Local `phase-1` tag marks the final release commit; pushing the branch and tag is pending.
 
 ## Five-task evidence
 

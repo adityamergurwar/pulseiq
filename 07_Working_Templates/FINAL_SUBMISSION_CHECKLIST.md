@@ -8,5 +8,5 @@
 - [x] Local Phase 1 report, September management PDF, nine-sheet Excel snapshot and nine-slide board deck are in the output folders listed in `README.md`.
 - [ ] Record the five-minute live demo from `docs/board_demo_script.md` after deployment.
 - [x] No production password or secret value is stored in source files; production configuration uses host secrets.
-- [ ] Confirm the personal learning summary, public repo URL and `phase-1` tag before programme submission.
+- [ ] Confirm the personal learning summary, push the private repo and `phase-1` tag, then record the repository URL before programme submission.
 - [ ] Add `fobesitech` as a collaborator and upload the named Phase 1 PDF after the repository is available.

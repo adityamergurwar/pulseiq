@@ -87,4 +87,4 @@ Both packs default to the latest observed workforce month when `--month` is omit
 
 ## Release status
 
-The project runs locally and the local acceptance checks pass. The requested private [pulseiq repository](https://github.com/adityamergurwar/pulseiq) is the publication target; its push and `phase-1` tag are pending. There is no public dashboard URL, hosted refresh schedule, or recorded demo yet. Public release also requires an owner to review the seeded raw-data findings and configure production login secrets. The exact items still needing the project owner's account or personal input are listed in the acceptance matrix.
+The project runs locally and the local acceptance checks pass. The requested private [pulseiq repository](https://github.com/adityamergurwar/pulseiq) is configured as the remote; the branch and `phase-1` tag still need to be pushed. There is no public dashboard URL, hosted refresh schedule, or recorded demo yet. Public release also requires an owner to review the seeded raw-data findings and configure production login secrets. The exact items still needing the project owner's account or personal input are listed in the acceptance matrix.

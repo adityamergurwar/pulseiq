@@ -14,4 +14,4 @@
 - Added a regression test for the headcount dashboard's prior-month query. The prior query repeats a department filter, so the call now binds all three parameters.
 - Local test suite: 7 passed. Independent acceptance checks reconcile 18 payroll periods and 180 privacy-safe department-months.
 - Source data cutoff: 2026-09-30. No overlap exists between forecast periods and actuals, so forecast error is not estimable.
-- Release remains local. No remote repository, production secret configuration, live URL, scheduled incoming data or recorded live demo is available in this workspace.
+- The private Git remote is configured locally and the `phase-1` tag is ready. GitHub authentication and the initial push remain outstanding. No production secret configuration, live URL, scheduled incoming data or recorded live demo is available in this workspace.
