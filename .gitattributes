@@ -1,0 +1,6 @@
+*.pdf binary
+*.pptx binary
+*.xlsx binary
+*.png binary
+*.duckdb binary
+*.zip binary

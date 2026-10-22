@@ -1,10 +1,12 @@
-# Aura Workforce PulseIQ · Phase 1
+# Aura Workforce PulseIQ
 
-Foundation project for the fictional Zenith Nova workforce dataset. The project keeps the supplied CSVs as immutable bronze inputs, validates contracted feeds, builds clean and warehouse schemas, records quarantines and runs a quality report.
+PulseIQ is a workforce and finance analytics product for the fictional Zenith Nova Technologies dataset. It contains a repeatable DuckDB pipeline, an auditable clean layer, a star-schema warehouse, 28 governed metrics, 12 Streamlit pages, a five-metric FastAPI service, validation evidence and monthly report builders.
 
-## Quick start
+All supplied people, companies and amounts are fictional training data. Source CSVs are retained as raw evidence. Invalid records are recorded with their source row and reason; derived outputs use the conformed or privacy-safe layer.
 
-Python 3.11+ is required.
+## Run locally
+
+Python 3.11 or newer is required.
 
 ```powershell
 python -m venv .venv
@@ -14,27 +16,75 @@ python etl.py
 streamlit run app.py
 ```
 
-The pipeline reads `03_Data/csv/`, creates `pulseiq.duckdb`, and prints row reconciliation and 14 DQ checks. It is safe to rerun: source tables and derived layers are replaced as a complete refresh; the quarantine and run logs retain audit history. Contract rules are present for `fact_anomaly`, `fact_attrition_risk`, `fact_forecast`, and `fact_task`; other feed contracts will be added when the source contract sheet provides them. The ETL applies supplied type, requiredness, allowed-value, range and identifier-format rules, and fails on missing contracted columns. Unexpected source columns are currently retained in raw/clean and surfaced for review rather than dropped.
+The app builds `pulseiq.duckdb` from `03_Data/csv/` on its first run if the file is absent. The same build can be run directly with `python etl.py`. A refresh replaces raw, clean, warehouse and metric tables while retaining ETL run and quarantine history.
 
-## Data layers
+Run the checks and the answer-key reconciliation:
 
-- `raw`: exact CSV import; treated as immutable source evidence.
-- `clean`: contract-passing rows. Failed contracted rows are preserved in `audit.quarantine` with source row and a reason.
-- `warehouse`: source dimensions and facts, retaining `employee_key` so department history is interpreted as of the relevant month.
-- `metrics`: 28 governed `mNN_*` views, dashboard views and `metric_catalog`.
-- `audit`: `load_summary`, `dq_results`, `orphan_results`, `quarantine`, and ETL run log.
+```powershell
+python -m unittest discover -s tests -v
+python scripts/verify_acceptance.py
+```
 
-## Notes and evidence
+Run the metric API in another terminal:
 
-- [Star schema and join map](docs/star_schema.md)
-- [Contract notes for three tables](docs/contract_notes.md)
-- [Quality checks and decisions](docs/data_quality.md)
-- [Phase 1 report draft](docs/phase1_report.md)
+```powershell
+uvicorn pulseiq.api:app --host 127.0.0.1 --port 8000
+```
 
-The report draft intentionally leaves your name, repository URL, tag, screenshots, and personal learning reflection as placeholders. The supplied starter's workbook README/data dictionary is distributed as `03_Data/PulseIQ_Dataset.xlsx`; the CSV extracts and dictionaries are included in the repository for convenient use.
+The OpenAPI UI is at `http://127.0.0.1:8000/docs`. The API exposes M01, M04, M09, M20 and M22 with definitions, lineage, data cutoff and privacy metadata.
 
-## Scope and known limits
+## Dashboards
 
-The current source `data_contracts.csv` defines only four feed contracts. Several DQ catalog rules refer to names from an earlier schema; `etl.py` maps the 14 checks to the actual delivered columns and records their bad-row counts. `DQ-C01` is a reconciliation count, and `DQ-C13` evaluates the latest run log. Finance and dashboard outputs should be reviewed against the official validation key after each task is completed.
+The Streamlit app includes workforce, attendance and leave, attrition, team productivity, payroll and cost, budget and KPI targets, P&L and expenses, receivables and cash, department impact, forecasts and anomalies, executive scorecard, KPI builder, and data quality and lineage.
 
-No GitHub repository is created or published from this local workspace. Once you create the private `pulseiq` repository, add its URL and your identity to the report, then push and tag the finished work. The validation-vault answer files have not yet been consulted; compare them after a successful pipeline run as the vault directs.
+The local demo persona selector is a role simulation, not authentication. For a hosted deployment set `PULSEIQ_REQUIRE_LOGIN=1` and provide password hashes through the host secret `PULSEIQ_USERS_JSON`. See [deployment notes](docs/deployment.md); never commit secrets.
+
+## Data and metric contracts
+
+- `raw` retains the supplied CSV values.
+- `clean` applies data-dictionary type/nullability rules, specialized contracts and row-level dispositions.
+- `warehouse` holds conformed dimensions and facts, with employee history joined by `employee_key`.
+- `metrics` owns M01-M28 and dashboard-safe aggregate views.
+- `audit` records row counts, quarantine reasons, quality findings, relationship checks, corrections and ETL runs.
+
+The supplied `data_contracts.csv` defines additional value/range/format rules for four feeds. The source dictionary provides schema and nullability checks for 297 columns across 23 operational dimension/fact tables. Unexpected columns are retained and logged for schema review. See [contract notes](docs/contract_notes.md), [star schema](docs/star_schema.md), [metric lineage](docs/lineage.md), and [quality results](docs/validation_results.md).
+
+## Monthly management pack
+
+The PDF report builder uses the latest observed month by default or accepts a month such as `2026-09`:
+
+```powershell
+python scripts/build_monthly_pack.py --month 2026-09
+```
+
+Build the companion Excel snapshot from governed metric and audit views with:
+
+```powershell
+python scripts/build_monthly_excel.py --month 2026-09
+```
+
+Both packs default to the latest observed workforce month when `--month` is omitted. The Excel file includes nine summary and supporting sheets. The September 2026 outputs label the data cutoff and source limitations. They do not present forecast values as actuals. A recurring hosted export still needs a host and a changing source feed.
+
+## Container package
+
+`Dockerfile` and `docker-compose.yml` package the warehouse, dashboard and API. The Compose setup requires production login secrets from the shell environment. See [deployment notes](docs/deployment.md).
+
+## Project evidence
+
+- [Task acceptance matrix](docs/task_acceptance_matrix.md)
+- [Phase 1 report](docs/phase1_report.md)
+- [Validation results](docs/validation_results.md)
+- [Deployment runbook](docs/deployment.md)
+- [Board demo script](docs/board_demo_script.md)
+- [Release notes](docs/release_notes.md)
+
+## Local deliverables
+
+- Phase 1 evidence report: `output/pdf/DataAnalytics_Aditya_Mergurwar_Phase1_Report.pdf`
+- September management pack: `output/pdf/PulseIQ_Monthly_Pack_2026-09.pdf`
+- Nine-sheet Excel snapshot: `outputs/pulseiq-monthly/PulseIQ_Monthly_Pack_2026-09.xlsx`
+- Nine-slide board briefing: `output/pptx/PulseIQ_Board_Pack_September_2026.pptx`
+
+## Release status
+
+The project runs locally and the local acceptance checks pass. The requested private [pulseiq repository](https://github.com/adityamergurwar/pulseiq) is the publication target; its push and `phase-1` tag are pending. There is no public dashboard URL, hosted refresh schedule, or recorded demo yet. Public release also requires an owner to review the seeded raw-data findings and configure production login secrets. The exact items still needing the project owner's account or personal input are listed in the acceptance matrix.

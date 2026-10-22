@@ -1,0 +1,30 @@
+# Task acceptance matrix
+
+Scope: all 20 PulseIQ tasks in the supplied Task Playbook, checked against the code and the latest local warehouse. "Local pass" means the task's product/core outcome is present and validated in this workspace. It does not claim an external deployment, account action or recorded personal demo.
+
+| Task | Local result | Evidence / remaining work |
+|---|---|---|
+| PQ-01 ETL and data contracts | PASS | `etl.py`; 29 source CSVs; 297 schema checks across 23 operational tables; four feeds also have specialized contracts; row-count reconciliation and quarantine reasons are in `audit.load_summary` / `audit.quarantine`. Rerun comparison is recorded in validation results. |
+| PQ-02 Star schema | PASS | `docs/star_schema.md`; 0 declared orphans; fact row counts reconcile to passing rows; SCD facts use `employee_key`. |
+| PQ-03 Data quality | PASS with findings | 14 checks run on every ETL load; injection tests exercise all 14; all 11 validation-vault issue categories are detected. Raw issues remain visible by design; dispositions and overlaps are documented. |
+| PQ-04 Governed metrics | PASS | 28 metric views return rows; catalog includes definitions, source, grain, owner and privacy; hand calculations and small-group suppression are verified. M28 error is correctly null because its horizons do not overlap actuals. |
+| PQ-05 Workforce dashboard | PASS | `app.py`; department and month filters, headcount/hires/exits cards, trend, department/level/location/work-mode mix, and a numeric finding under each chart. Five CEO questions are in the Phase 1 report. |
+| PQ-06 Attendance and leave | PASS | `pages/01_Attendance_and_Leave.py`; attendance, lateness, overtime, month and holiday leave views, department and date scope, numeric insights. |
+| PQ-07 Attrition | PASS | `pages/02_Attrition.py`; exits, monthly rate, tenure, reasons, and a separately labeled grouped prediction view with no names. |
+| PQ-08 Team productivity | PASS | `pages/03_Team_Productivity.py`; selector covers 16 teams and 38 sprints, with velocity, cycle time, overdue, blocked, reopened, on-time and completion metrics. T01 and T02 in SP-01 are hand checked. |
+| PQ-09 Payroll cost | PASS | `pages/04_Payroll_and_Cost.py`; gross, net, employer cost, cost per head, role views and role-gated salary detail. 18 periods match the answer key within INR 0.01 after clean exclusions/correction. |
+| PQ-10 Budget and targets | PASS | `pages/05_Budget_vs_Actual.py`; budget, actual, signed variance, variance percentage, ranked departments, target status and recommendations. Three department calculations match independent checks. |
+| PQ-11 P&L and expense | PASS | `pages/06_PnL_and_Expenses.py`; ledger-based revenue, expense, margin, vendor and category detail. Monthly P&L reconciles to net profit within floating-point precision. |
+| PQ-12 Receivables and cash | PASS | `pages/07_Receivables_and_Cash.py`; ageing buckets, DSO, payment speed, overdue clients and cash movement. Open receivables at 2026-09-30 sum to INR 139,394,278. |
+| PQ-13 Department impact | PASS with explained differences | `pages/08_Department_Impact.py`; cost/attrition comparison and joined people, attendance, leave and task measures. 180 privacy-safe department-months match; the 18 one-person D00 groups are suppressed and task differences match quarantines. |
+| PQ-14 AI signals | PASS | `pages/09_Forecasts_and_Anomalies.py`; grouped anomaly flags, headcount forecast and 80% bounds. It clearly says forecast accuracy is unavailable until actuals overlap. |
+| PQ-15 Executive scorecard | PASS | `pages/10_Executive_Scorecard.py`; one-page headline trends, targets, status and scoped company view. |
+| PQ-16 Report builder and package | PARTIAL locally | Repeatable PDF and Excel builders, the September PDF and nine-sheet workbook, and the Docker/Compose package are included. A hosted recurring export still needs a configured host and a changing source feed. |
+| PQ-17 Production go-live | NOT COMPLETE | No Git remote or hosting account is configured. There is no public URL, configured secret store, phone test or live scheduled refresh. See `docs/deployment.md`. |
+| PQ-18 KPI builder | PASS | `pages/11_KPI_Builder.py`; catalog-driven company/department/team drill-down, role scope and minimum-sample suppression. |
+| PQ-19 API and lineage | PASS locally | FastAPI provides five governed metrics with definitions and freshness; tests cover schema, metadata and invalid inputs. `docs/lineage.md` traces the source-to-dashboard path. Hosted API remains part of deployment. |
+| PQ-20 Board pack and final submission | PARTIAL | The nine-slide board deck and five-minute walkthrough script are included. The deck passes package, layout, embedded-chart-data and first-party import checks. A recorded live demo, public link, GitHub collaborator `fobesitech`, owner-confirmed personal reflection and programme upload remain outstanding. |
+
+## Gate interpretation
+
+Seven tests pass locally, including regressions for the three-parameter prior-month headcount query that caused the supplied screenshot's DuckDB exception and the repeatable Excel export. `scripts/verify_acceptance.py` confirms 28 metric views, all hand calculations, the PQ-09 reconciliation and the privacy-safe PQ-13 comparison. Raw planted issues continue to appear in the DQ page as `REVIEW REQUIRED`; the clean layer corrects or quarantines documented rows without changing source evidence.

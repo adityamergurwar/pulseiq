@@ -1,8 +1,7 @@
 # Daily Log
-Copy one block per working day.
 
-**Date:** 
-**Done today:** 
-**Doing next:** 
-**Blocked by:** (write the exact error or question; see STUCK_HELP_TEMPLATE.md)
-**One thing I learned:** 
+**Date:** 2026-10-19
+**Done today:** Fixed the workforce prior-month query binding and added its regression test; six tests and local acceptance checks pass. Built and reviewed the September PDF and Excel packs, the Phase 1 evidence report and the nine-slide board deck. Updated lineage, quality, deployment and submission documentation.
+**Doing next:** Review seeded raw-data findings, connect the repository and hosting accounts, then complete the public deployment and live walkthrough.
+**Blocked by:** No Git remote or hosting account is configured in this workspace; no public URL is available.
+**One thing learned:** A repeated SQL filter needs a bound value for each placeholder, and a regression test should exercise the real query with both company and department scopes.
