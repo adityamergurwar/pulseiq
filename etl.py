@@ -182,6 +182,19 @@ def _contract_issues(table: str, row: dict[str, Any], columns: list[str], contra
             issues.append("completed_date is required for Done tasks")
         if not any(is_blank(v) for v in (started, completed)) and completed < started:
             issues.append("completed_date must not precede started_date")
+    if table == "fact_leave":
+        start_date, end_date = row.get("start_date"), row.get("end_date")
+        if not is_blank(start_date) and not is_blank(end_date) and end_date < start_date:
+            issues.append("end_date precedes start_date; leave row quarantined")
+    if table == "fact_expense":
+        total, amount_excl_gst, gst_amount = (row.get(c) for c in ("total_amount", "amount_excl_gst", "gst_amount"))
+        if not any(is_blank(v) for v in (total, amount_excl_gst, gst_amount)):
+            try:
+                if abs(float(total) - float(amount_excl_gst) - float(gst_amount)) > 0.01:
+                    issues.append("total_amount does not equal amount_excl_gst + gst_amount; expense row quarantined")
+            except (TypeError, ValueError, OverflowError):
+                # The schema pass records malformed numeric values with a clearer type reason.
+                pass
     return list(dict.fromkeys(issues))
 
 

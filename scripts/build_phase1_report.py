@@ -1,4 +1,4 @@
-"""Create the two-page Phase 1 evidence report from verified project results."""
+"""Create the Phase 1 evidence report from verified project results and a live-app screenshot."""
 from pathlib import Path
 
 from reportlab.lib import colors
@@ -6,10 +6,11 @@ from reportlab.lib.enums import TA_LEFT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle, PageBreak
+from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle, PageBreak
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "output" / "pdf" / "DataAnalytics_Aditya_Mergurwar_Phase1_Report.pdf"
+SCREENSHOT = ROOT / "output" / "evidence" / "PulseIQ_Live_Dashboard_2026-10-22.png"
 INK = colors.HexColor("#14213d")
 TEAL = colors.HexColor("#117c78")
 PALE = colors.HexColor("#e8f3f1")
@@ -61,9 +62,10 @@ def build():
     meta = [
         ["Author", "Aditya Mergurwar", "Data cutoff", "30 Sep 2026"],
         ["Repository", "Private GitHub: main published", "Phase tag", "phase-1 at 965d9f6"],
+        ["Live dashboard", "pulseiq-workforce.streamlit.app", "Production login", "Pending hosted secrets"],
     ]
     story.append(make_table(meta, [22 * mm, 67 * mm, 23 * mm, 50 * mm], header=False, font_size=7.6))
-    story += [Spacer(1, 5), Paragraph("Phase 1 built a validated local warehouse, a 28-metric governed layer, and the first workforce dashboard. The private GitHub repository and phase tag are published. Public hosting and programme submission still need the account and owner actions listed on page 2.", styles["Callout"])]
+    story += [Spacer(1, 5), Paragraph("Phase 1 built a validated local warehouse, a 28-metric governed layer, and the first workforce dashboard. The private GitHub repository and phase tag are published, and the dashboard is deployed. Production login, phone/viewer verification and programme submission still need the account and owner actions listed on page 2.", styles["Callout"])]
     story.append(Paragraph("Five task outcomes", styles["SectionCustom"]))
     tasks = [
         ["Task", "Result", "Evidence"],
@@ -77,8 +79,8 @@ def build():
     story.append(Paragraph("Validation evidence", styles["SectionCustom"]))
     checks = [
         ["Check", "Result"],
-        ["Automated tests", "8 passed, including headcount, monthly Excel export and host-secret configuration regressions."],
-        ["Rerun safety", "Two full ETL refreshes produced identical row counts and business snapshots."],
+        ["Automated tests", "13 passed, including dashboard query, monthly Excel export, host-secret configuration, salary-role access, department-scope and seeded-issue disposition regressions."],
+        ["Rerun safety", "Two full ETL refreshes produced identical row counts and business snapshots, with 31 invalid rows quarantined and explained."],
         ["Metric layer", "28 of 28 governed metric views return rows; M28 error is null because actuals and forecasts do not overlap."],
         ["Payroll reconciliation", "18 of 18 reference months match; maximum clean payroll-to-ledger difference INR 0.00000004 (tolerance INR 0.01)."],
         ["Department comparison", "180 privacy-safe rows match; 18 one-person D00 rows are withheld; task differences match quarantined rows."],
@@ -113,8 +115,16 @@ def build():
     story.append(Paragraph("Problems and fixes", styles["SectionCustom"]))
     story.append(Paragraph("The workforce page raised a DuckDB invalid-input error because the prior-month query had three placeholders but received two values. The department filter is now bound twice and the selected period once, with a regression test for company and department scopes. Seeded payroll, attendance, task, invoice, leave, expense, attrition-risk and SCD issues remain in raw evidence and are documented with their clean-layer handling.", styles["BodyCustom"]))
     story.append(Paragraph("Next phase and submission", styles["SectionCustom"]))
-    story.append(Paragraph("The private GitHub main branch is published with the latest deployment readiness update; the phase-1 tag remains pinned to release commit 965d9f6. Still required for formal submission: deploy with production secrets, review the seeded raw-data findings, provide a changing source feed before scheduling refreshes, add fobesitech as a collaborator, verify the live link on a phone, record the five-minute demo, confirm the personal learning reflection and upload the required files.", styles["BodyCustom"]))
+    story.append(Paragraph("The private GitHub main branch is published with the latest deployment readiness update; the phase-1 tag remains pinned to release commit 965d9f6. A monthly warehouse/report workflow is configured; its first hosted run and a changing source feed remain unconfirmed. Still required for formal submission: save production login secrets and verify role access, review the seeded raw-data findings, add fobesitech as a collaborator, test the live link on a phone and with another viewer, record the five-minute demo, confirm the personal learning reflection and upload the required files.", styles["BodyCustom"]))
     story.append(Paragraph("Source: supplied fictional PulseIQ data, validation vault and project playbook. Detailed results are in docs/validation_results.md and docs/task_acceptance_matrix.md.", styles["Note"]))
+    if SCREENSHOT.exists():
+        story.append(PageBreak())
+        story.append(Paragraph("Live dashboard evidence", styles["TitleCustom"]))
+        story.append(Paragraph("Owner-supplied browser screenshot of the deployed app at pulseiq-workforce.streamlit.app. This proves the dashboard rendered at the public URL; the visible demo persona selector also shows that production login still needs to be enabled.", styles["Deck"]))
+        story.append(Spacer(1, 5))
+        story.append(Image(str(SCREENSHOT), width=174 * mm, height=98 * mm, kind="bound"))
+        story.append(Spacer(1, 5))
+        story.append(Paragraph("The screenshot uses fictional Zenith Nova training data. Do not use this demo persona as production authentication.", styles["Note"]))
 
     def footer(canvas, document):
         canvas.saveState()

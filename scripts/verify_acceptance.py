@@ -154,7 +154,7 @@ def run(vault:Path):
     lines += ["## Seeded issue detection","", "| Check | Status | Findings |", "|---|---:|---:|"]
     dq=con.execute("SELECT check_id,status,bad_rows FROM audit.dq_results WHERE run_id=? ORDER BY check_id",[latest]).fetchall()
     for check_id,status,n in dq: lines.append(f"| {check_id} | {status} | {n} |")
-    lines += ["", "DQ-C06 flags the same post-exit attendance row already identified by DQ-C05; it is not an additional planted issue. The clean warehouse quarantines the four post-exit attendance rows, four invalid payroll rows and 20 invalid task rows. The raw source stays intact. The SCD overlap and DQ-04 ledger mismatch are corrected in the conformed warehouse and recorded in audit tables.",""]
+    lines += ["", "DQ-C06 flags the same post-exit attendance row already identified by DQ-C05; it is not an additional planted issue. The clean warehouse quarantines four post-exit attendance rows, four invalid payroll rows, two reversed-date leave rows, one expense arithmetic mismatch and 20 invalid task rows. The raw source stays intact. The SCD overlap and DQ-04 ledger mismatch are corrected in the conformed warehouse and recorded in audit tables.",""]
 
     # Calculator checks and task-level arithmetic checks.
     checks=manual_checks(con)

@@ -14,9 +14,9 @@ The validation vault contains 11 planted issue categories. All 11 were detected.
 | DQ-04 payroll-ledger mismatch | DQ-C01 | 1 planted June mismatch | Raw source remains unchanged. The clean layer applies a documented balanced-entry correction of INR 18,450; all 18 clean monthly periods reconcile within INR 0.01. Other raw monthly DQ-C01 differences are explained by the duplicate and orphan payroll rows. |
 | DQ-05 overpaid invoice | DQ-C07 | 1 | Negative balance is identified; the open-receivables view includes only positive balances. |
 | DQ-06 / DQ-07 invalid task dates | DQ-C09 | 20 | Twelve negative cycle-time records and eight Done rows without dates are quarantined from task metrics. |
-| DQ-08 reversed leave dates | DQ-C10 | 2 | Warning remains visible in the audit results; raw dates are preserved. |
+| DQ-08 reversed leave dates | DQ-C10 | 2 | Both rows are quarantined with the date-order reason, so monthly and holiday leave metrics use only valid ranges; raw dates and the warning remain visible. |
 | DQ-09 stale risk batch | DQ-C11 | 5 | The older batch is identified; grouped risk views use the latest as-of date only. |
-| DQ-10 expense arithmetic | DQ-C08 | 1 | The INR 500 component mismatch remains visible in DQ output; the ledger-based P&L does not use this expense row as its source. |
+| DQ-10 expense arithmetic | DQ-C08 | 1 | The mismatched row is quarantined, so clean expense category and vendor views exclude it. The raw finding stays visible; the ledger-based P&L is sourced separately. |
 | DQ-11 employee history overlap | DQ-C12 | 1 | The SCD range is repaired in the conformed warehouse and recorded in `audit.scd_repairs`; raw history is preserved. |
 
 ## Severity and release gate

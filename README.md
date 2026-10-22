@@ -69,6 +69,10 @@ Both packs default to the latest observed workforce month when `--month` is omit
 
 `Dockerfile` and `docker-compose.yml` package the warehouse, dashboard and API. The Compose setup requires production login secrets from the shell environment. See [deployment notes](docs/deployment.md).
 
+## Scheduled refresh and monthly packs
+
+`.github/workflows/monthly-refresh.yml` rebuilds the warehouse, runs the tests and acceptance checks, then creates a PDF and Excel pack. It runs monthly, on demand, and when source CSVs or pipeline code change. A source-data change on `main` also causes Streamlit Community Cloud to redeploy the app, which rebuilds the warehouse on cold start. The supplied dataset is a fixed training snapshot ending 2026-09-30; a scheduled run cannot advance that cutoff without a new source feed.
+
 ## Project evidence
 
 - [Task acceptance matrix](docs/task_acceptance_matrix.md)
@@ -84,7 +88,8 @@ Both packs default to the latest observed workforce month when `--month` is omit
 - September management pack: `output/pdf/PulseIQ_Monthly_Pack_2026-09.pdf`
 - Nine-sheet Excel snapshot: `outputs/pulseiq-monthly/PulseIQ_Monthly_Pack_2026-09.xlsx`
 - Nine-slide board briefing: `output/pptx/PulseIQ_Board_Pack_September_2026.pptx`
+- Live dashboard screenshot evidence: `output/evidence/PulseIQ_Live_Dashboard_2026-10-22.png`
 
 ## Release status
 
-The local acceptance checks pass. The private [pulseiq repository](https://github.com/adityamergurwar/pulseiq) has a published `main` branch and annotated `phase-1` tag; the tag marks commit `965d9f6`. The current `main` also includes a follow-up that supports secrets from Streamlit Community Cloud. A public dashboard URL, production login secrets, incoming source feed and hosted refresh schedule, owner review of the seeded raw-data findings, live phone test, recorded demo, collaborator access, personal learning reflection, and programme upload are still outstanding. The acceptance matrix lists these remaining account and owner actions.
+The private [pulseiq repository](https://github.com/adityamergurwar/pulseiq) has a published `main` branch and annotated `phase-1` tag; the tag marks commit `965d9f6`. The Streamlit dashboard is deployed at [pulseiq-workforce.streamlit.app](https://pulseiq-workforce.streamlit.app). The user-confirmed screenshot still showed the local demo persona selector, so production login is not yet verified. The monthly workflow is configured in the repository; its first GitHub Actions run and an incoming source feed are not yet confirmed. Phone and stranger checks, collaborator access, the recorded live demo, owner-confirmed learning reflection and programme upload remain to be completed. See the [acceptance matrix](docs/task_acceptance_matrix.md) and [deployment runbook](docs/deployment.md) for exact status.

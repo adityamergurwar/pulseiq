@@ -1,21 +1,10 @@
 # Local acceptance evidence
 
-Generated: 2026-10-22 11:13
-
-## Repeatable Excel export · 2026-10-22
-
-- `scripts/build_monthly_excel.py --month 2026-09` generated all nine expected sheets from governed metric, dashboard and audit views.
-- September headcount (441), employer payroll cost (INR 55,519,621.87), net profit (INR 14,985,979.13) and open receivables (INR 139,394,278) match the source views.
-- The workbook keeps the seeded raw-source findings visible, marks the data-quality gate `REVIEW REQUIRED`, and shows the clean payroll-to-ledger reconciliation as `PASS`.
-- All nine sheets were rendered and visually reviewed. The formula-error scan found zero matches.
-
-## Automated tests · 2026-10-22
-
-- All 8 tests passed, including the regression for Streamlit-hosted secrets and environment-variable precedence.
+Generated: 2026-10-22 12:23
 
 ## Pipeline and warehouse
 
-- Latest run: `ee686ff7-fd41-4cf4-9941-1f769fab383a`; source tables: 29; unexplained row-count difference: 0.
+- Latest run: `c47e18eb-cba4-488e-b4cb-21241629c770`; source tables: 29; unexplained row-count difference: 0.
 - Warehouse declared relationships with orphans: 0.
 - Governed metric views: 28; all have rows: True.
 - M28 rows: 66; measured values: 0 (actuals start after supplied forecast horizon).
@@ -39,7 +28,7 @@ Generated: 2026-10-22 11:13
 | DQ-C13 | PASS | 0 |
 | DQ-C14 | PASS | 0 |
 
-DQ-C06 flags the same post-exit attendance row already identified by DQ-C05; it is not an additional planted issue. The clean warehouse quarantines the four post-exit attendance rows, four invalid payroll rows and 20 invalid task rows. The raw source stays intact. The SCD overlap and DQ-04 ledger mismatch are corrected in the conformed warehouse and recorded in audit tables.
+DQ-C06 flags the same post-exit attendance row already identified by DQ-C05; it is not an additional planted issue. The clean warehouse quarantines four post-exit attendance rows, four invalid payroll rows, two reversed-date leave rows, one expense arithmetic mismatch and 20 invalid task rows. The raw source stays intact. The SCD overlap and DQ-04 ledger mismatch are corrected in the conformed warehouse and recorded in audit tables.
 
 ## Hand calculations
 
@@ -109,3 +98,11 @@ DQ-C06 flags the same post-exit attendance row already identified by DQ-C05; it 
 - DQ checks: 14 automated; 4 critical check(s) fail against the intentionally seeded raw issues and 7 warning check(s) are recorded.
 - Release gate remains REVIEW REQUIRED until a human reviews source findings. Clean-layer reconciliation and all calculations above can pass while raw DQ checks still report planted issues.
 - Forecast MAPE is not estimable because actuals end in September 2026 and the supplied forecast starts in October 2026.
+
+## Build verification
+
+- Unit/regression suite: 13 tests passed on 2026-10-22, including role access, department scope, host-secret lookup, the dashboard query regression, and seeded-row quarantine behavior.
+- Docker: rebuilt all three Python 3.11 service images and ran the warehouse initializer in an isolated Compose project. It exited successfully with 29/29 source-table reconciliations, 31 documented quarantines, and 0 declared orphans. The seeded raw findings intentionally leave the release gate at `REVIEW REQUIRED`. The isolated validation volume was removed after the check; the Compose interpolation used only an empty placeholder, not production credentials.
+- Monthly workbook: generated from the latest ETL run, imported, recalculated and exported with Artifact Tool. It contains 9 sheets and 9 tables; the overview matches September 2026 governed values and the quality tab shows the source findings and 31 clean-layer quarantines. Formula-error scan found no matches. The overview and quality views were rendered and inspected.
+- Reports: regenerated the September management pack (4 pages) and Phase 1 evidence report (3 pages) from the latest evidence. All pages were rendered and visually inspected.
+- Local app, Docker, tests and report generation are verified in this workspace. The first remote GitHub Actions run and production authentication remain unverified until the repository/workspace account actions in `docs/deployment.md` are completed.

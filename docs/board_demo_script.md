@@ -1,6 +1,6 @@
 # Five-minute board demo script
 
-This is a recording guide, not a recording. Record it only after a public URL has been configured.
+This is a recording guide, not a recording. The deployed app is [pulseiq-workforce.streamlit.app](https://pulseiq-workforce.streamlit.app). Record it only after production login is configured and the link has been checked from a phone and by another viewer. Use a production role account; do not display the local demo persona selector, passwords, secret values or individual predicted-risk names.
 
 | Time | Screen | Talk track |
 |---|---|---|

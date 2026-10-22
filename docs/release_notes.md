@@ -1,5 +1,13 @@
 # PulseIQ release notes
 
+## 2026-10-22 · Live deployment and scheduled reporting
+
+- Confirmed from the owner's browser screenshot that the deployed dashboard loads at [pulseiq-workforce.streamlit.app](https://pulseiq-workforce.streamlit.app).
+- Added a monthly GitHub Actions workflow to rebuild the warehouse, run tests and acceptance checks, and publish the PDF/Excel pack as a downloadable artifact. It also runs on demand and when source/pipeline files change.
+- Added automated access-control and seeded-issue disposition tests for salary-role permissions, department scopes, reversed leave dates and mismatched expense totals.
+- The ETL now quarantines reversed-date leave and mismatched expense rows from clean metrics while preserving the raw source and DQ findings.
+- Updated deployment, submission and acceptance documents. Production authentication is still pending in Streamlit Secrets; the supplied dataset remains a fixed snapshot through 2026-09-30.
+
 ## 2026-10-22 · GitHub release published
 
 - Published the private `main` branch and annotated `phase-1` tag to [adityamergurwar/pulseiq](https://github.com/adityamergurwar/pulseiq).
