@@ -1,0 +1,42 @@
+services:
+  warehouse-init:
+    build: .
+    command: ["python", "etl.py"]
+    environment:
+      PULSEIQ_DB_PATH: /data/pulseiq.duckdb
+    volumes:
+      - pulseiq-data:/data
+    restart: "no"
+
+  dashboard:
+    build: .
+    command: ["streamlit", "run", "app.py", "--server.address=0.0.0.0", "--server.port=8501"]
+    depends_on:
+      warehouse-init:
+        condition: service_completed_successfully
+    environment:
+      PULSEIQ_DB_PATH: /data/pulseiq.duckdb
+      PULSEIQ_REQUIRE_LOGIN: "1"
+      PULSEIQ_USERS_JSON: ${PULSEIQ_USERS_JSON:?Set PULSEIQ_USERS_JSON through the host secret manager}
+    ports:
+      - "8501:8501"
+    volumes:
+      - pulseiq-data:/data
+    restart: unless-stopped
+
+  api:
+    build: .
+    command: ["uvicorn", "pulseiq.api:app", "--host=0.0.0.0", "--port=8000"]
+    depends_on:
+      warehouse-init:
+        condition: service_completed_successfully
+    environment:
+      PULSEIQ_DB_PATH: /data/pulseiq.duckdb
+    ports:
+      - "8000:8000"
+    volumes:
+      - pulseiq-data:/data
+    restart: unless-stopped
+
+volumes:
+  pulseiq-data:

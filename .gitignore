@@ -1,5 +1,7 @@
 __pycache__/
 .venv/
+.artifact_build/
+.chart-data-*/
 *.py[cod]
 *.duckdb
 *.wal

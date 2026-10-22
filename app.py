@@ -1,68 +1,96 @@
-"""PulseIQ workforce overview. All displayed measures come from metrics views."""
-from pathlib import Path
-import duckdb
+"""PulseIQ workforce overview. All measures come from governed metric views."""
+from __future__ import annotations
+
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-DB = Path(__file__).with_name("pulseiq.duckdb")
+from pulseiq.app_common import DB_PATH, department_picker, ensure_database, insight, money, pct, prior_month_headcount, query_df, require_user
+
 st.set_page_config(page_title="PulseIQ | Workforce", page_icon="◉", layout="wide")
-st.markdown("<style>.block-container{padding-top:2rem;max-width:1440px} h1{letter-spacing:-.04em}</style>", unsafe_allow_html=True)
-st.title("PulseIQ · Workforce overview")
-st.caption("Validated warehouse · fictional Zenith Nova workforce data")
-if not DB.exists():
-    st.warning("Build the warehouse first: run `python etl.py` from the project root.")
+st.markdown("<style>.block-container{padding-top:1.8rem;max-width:1440px} h1{letter-spacing:-.035em}</style>", unsafe_allow_html=True)
+st.title("PulseIQ | Workforce and headcount")
+st.caption("Zenith Nova Technologies · fictional workforce data · governed metrics")
+if not ensure_database():
+    st.warning("Build the warehouse first by running `python etl.py` from the project root and check the refresh logs.")
     st.stop()
-con = duckdb.connect(str(DB), read_only=True)
-dates = con.execute("SELECT DISTINCT month_start_date FROM metrics.m01_headcount ORDER BY 1").fetchdf()
-departments = con.execute("SELECT DISTINCT department_id FROM metrics.dashboard_department_mix ORDER BY 1").fetchdf()
+user=require_user()
+if user["role"]=="MANAGER":
+    st.info("The manager persona is limited to its own team. Open Team productivity for your scoped sprint view.")
+    st.stop()
+dept=department_picker(user)
+dates=query_df("SELECT DISTINCT period FROM metrics.m01_headcount ORDER BY 1")
 if dates.empty:
-    st.info("No metric rows are available yet."); st.stop()
-latest = pd.to_datetime(dates.iloc[-1, 0]).date()
-department_options = ["All departments", *departments.department_id.tolist()]
-left, right = st.columns([1, 2])
-dept = left.selectbox("Department", department_options)
-date_value = right.selectbox("Month", pd.to_datetime(dates.month_start_date).dt.date.tolist(), index=len(dates)-1)
-where_dept = " AND department_id = ?"
-selected_dept = "ALL" if dept == "All departments" else dept
-params = [selected_dept]
-trend = con.execute("SELECT month_start_date, SUM(value) headcount FROM metrics.m01_headcount WHERE month_start_date <= ?" + where_dept + " GROUP BY 1 ORDER BY 1", [date_value, *params]).fetchdf()
-current = con.execute("SELECT SUM(value) FROM metrics.m01_headcount WHERE month_start_date=?" + where_dept, [date_value, *params]).fetchone()[0] or 0
-prior = con.execute("SELECT SUM(value) FROM metrics.m01_headcount WHERE month_start_date=(SELECT MAX(month_start_date) FROM metrics.m01_headcount WHERE month_start_date<?)" + where_dept, [date_value, *params]).fetchone()[0] or 0
-hires = con.execute("SELECT SUM(value) FROM metrics.m02_hires WHERE month_start_date=?" + where_dept, [date_value, *params]).fetchone()[0] or 0
-exits = con.execute("SELECT SUM(value) FROM metrics.m03_exits WHERE month_start_date=?" + where_dept, [date_value, *params]).fetchone()[0] or 0
-delta = ((current-prior)/prior*100) if prior else 0
+    st.info("No workforce metric rows are available.")
+    st.stop()
+date_values=pd.to_datetime(dates.period).dt.date.tolist()
+selected=st.sidebar.selectbox("Month end",date_values,index=len(date_values)-1)
+period=pd.Timestamp(selected).replace(day=1).date()
+dept_sql="department_id=?"
+trend=query_df(f"SELECT period,value AS headcount FROM metrics.m01_headcount WHERE {dept_sql} AND period<=? ORDER BY 1",[dept,selected])
+current=query_df(f"SELECT SUM(value) AS value FROM metrics.m01_headcount WHERE {dept_sql} AND period=?",[dept,selected])
+prior=prior_month_headcount(dept,selected)
+hires=query_df(f"SELECT SUM(value) AS value FROM metrics.m02_hires WHERE {dept_sql} AND period=?",[dept,selected])
+exits=query_df(f"SELECT SUM(value) AS value FROM metrics.m03_exits WHERE {dept_sql} AND period=?",[dept,selected])
+cur=float(current.iloc[0,0] or 0) if not current.empty else 0
+prev=float(prior.iloc[0,0] or 0) if not prior.empty else 0
+hire_count=int(hires.iloc[0,0] or 0) if not hires.empty else 0
+exit_count=int(exits.iloc[0,0] or 0) if not exits.empty else 0
+delta=(cur-prev)/prev*100 if prev else 0
 k1,k2,k3,k4=st.columns(4)
-k1.metric("Month end headcount", f"{current:,.0f}", f"{delta:+.1f}% vs prior month")
-k2.metric("Hires", f"{hires:,.0f}", "during selected month")
-k3.metric("Exits", f"{exits:,.0f}", "during selected month")
-k4.metric("Net change", f"{hires-exits:+,.0f}", "hires less exits")
+k1.metric("Month end headcount",f"{cur:,.0f}",f"{delta:+.1f}% vs prior month")
+k2.metric("Hires",f"{hire_count:,}","selected month")
+k3.metric("Exits",f"{exit_count:,}","selected month")
+k4.metric("Net change",f"{hire_count-exit_count:+,}","hires less exits")
 
-trend_title = f"Headcount {'grew' if delta >= 0 else 'fell'} {abs(delta):.1f}% to {current:,.0f} in {date_value:%b %Y}"
-fig = px.line(trend, x="month_start_date", y="headcount", markers=True, title=trend_title, color_discrete_sequence=["#167D8D"])
-fig.update_layout(template="plotly_white", xaxis_title=None, yaxis_title="Employees", margin=dict(l=10,r=10,t=55,b=5))
-st.plotly_chart(fig, use_container_width=True)
+if not trend.empty:
+    first=float(trend.head(1).headcount.iloc[0])
+    total_change=(cur-first)/first*100 if first else 0
+    direction="grew" if total_change>=0 else "fell"
+    fig=px.line(trend,x="period",y="headcount",markers=True,
+        title=f"Headcount {direction} {abs(total_change):.1f}% to {cur:,.0f}",
+        color_discrete_sequence=["#117C78"])
+    fig.update_layout(template="plotly_white",xaxis_title=None,yaxis_title="Employees",showlegend=False,margin=dict(l=10,r=10,t=55,b=5))
+    st.plotly_chart(fig,use_container_width=True)
+    insight(f"The selected group has {cur:,.0f} employees at month end, {delta:+.1f}% from the prior month.")
 
-if dept == "All departments":
-    mix = con.execute("SELECT department_name label, value FROM metrics.dashboard_department_mix WHERE month_start_date=? ORDER BY value DESC", [date_value]).fetchdf()
-else:
-    mix = con.execute("SELECT department_name label, value FROM metrics.dashboard_department_mix WHERE department_id=? AND month_start_date=?", [dept,date_value]).fetchdf()
-if not mix.empty:
-    top = mix.iloc[0]
+if user["role"] == "ADMIN":
+    mix=query_df("SELECT label,value FROM metrics.dashboard_department_mix WHERE period=? AND department_id<>'ALL' ORDER BY value DESC",[period])
+    if not mix.empty:
+        top=mix.iloc[0]
+        fig=px.bar(mix.sort_values("value"),x="value",y="label",orientation="h",
+          title=f"{top.label} is the largest department ({top.value:,.0f})",color_discrete_sequence=["#117C78"])
+        fig.update_layout(template="plotly_white",xaxis_title="Employees",yaxis_title=None,showlegend=False,margin=dict(l=10,r=10,t=55,b=5))
+        st.plotly_chart(fig,use_container_width=True)
+        insight(f"{top.label} has {top.value:,.0f} people, the largest department in {selected:%b %Y}.")
+elif user["role"] in {"HR","MANAGER"}:
+    st.info("Department mix is limited by the selected role. Manager personas see their team scope.")
+
+if user["role"] in {"ADMIN","HR"}:
+    group_id="ALL" if dept=="ALL" else dept
+    params=[period,group_id]
+    location=query_df("SELECT label,value FROM metrics.dashboard_location_tier WHERE period=? AND department_id=? ORDER BY value DESC",params)
+    level=query_df("SELECT label,value FROM metrics.dashboard_level_mix WHERE period=? AND department_id=? ORDER BY value DESC",params)
+    mode=query_df("SELECT label,value FROM metrics.dashboard_work_mode WHERE period=? AND department_id=? ORDER BY value DESC",params)
     c1,c2=st.columns(2)
-    f=px.bar(mix.sort_values("value"),x="value",y="label",orientation="h",title=f"{top.label} is the largest department at {top.value:,.0f}",color_discrete_sequence=["#167D8D"])
-    f.update_layout(template="plotly_white",xaxis_title="Employees",yaxis_title=None,showlegend=False,margin=dict(l=10,r=10,t=55,b=5))
-    c1.plotly_chart(f,use_container_width=True)
-    location=con.execute("SELECT label,value FROM metrics.dashboard_location_tier WHERE month_start_date=? AND department_id=? ORDER BY value DESC",[date_value,selected_dept]).fetchdf()
     if not location.empty:
-        pxloc=px.bar(location,x="label",y="value",title=f"Tier {location.iloc[0].label} has the largest workforce ({location.iloc[0].value:,.0f})",color_discrete_sequence=["#167D8D"])
-        pxloc.update_layout(template="plotly_white",xaxis_title="Location tier",yaxis_title="Employees",showlegend=False,margin=dict(l=10,r=10,t=55,b=5))
-        c2.plotly_chart(pxloc,use_container_width=True)
-    work=con.execute("SELECT label,value FROM metrics.dashboard_work_mode WHERE month_start_date=? AND department_id=? ORDER BY value DESC",[date_value,selected_dept]).fetchdf()
-    if not work.empty:
-        largest=work.iloc[0]
-        fwork=px.bar(work,x="label",y="value",title=f"{largest.label} is the most common work mode ({largest.value:,.0f})",color_discrete_sequence=["#167D8D"])
-        fwork.update_layout(template="plotly_white",xaxis_title="Work mode",yaxis_title="Employees",showlegend=False,margin=dict(l=10,r=10,t=55,b=5))
-        st.plotly_chart(fwork,use_container_width=True)
-st.caption(f"Selected month: {date_value:%d %b %Y} · Headcount history uses month-end warehouse snapshots.")
-con.close()
+        top=location.iloc[0]
+        fig=px.bar(location,x="label",y="value",title=f"Tier {top.label} has the largest workforce ({top.value:,.0f})",color_discrete_sequence=["#117C78"])
+        fig.update_layout(template="plotly_white",xaxis_title="Location tier",yaxis_title="Employees",showlegend=False)
+        c1.plotly_chart(fig,use_container_width=True);insight(f"Tier {top.label} contains {top.value:,.0f} employees in {dept}.")
+    if not level.empty:
+        top=level.sort_values("value",ascending=False).iloc[0]
+        fig=px.bar(level,x="label",y="value",title=f"Level {top.label} is the largest group ({top.value:,.0f})",color_discrete_sequence=["#117C78"])
+        fig.update_layout(template="plotly_white",xaxis_title="Job level",yaxis_title="Employees",showlegend=False)
+        c2.plotly_chart(fig,use_container_width=True);insight(f"Level {top.label} has the most employees in {dept}.")
+    if not mode.empty:
+        top=mode.sort_values("value",ascending=False).iloc[0]
+        fig=px.bar(mode,x="label",y="value",title=f"{top.label} is the most common work mode ({top.value:,.0f})",color_discrete_sequence=["#117C78"])
+        fig.update_layout(template="plotly_white",xaxis_title="Work mode",yaxis_title="Employees",showlegend=False)
+        st.plotly_chart(fig,use_container_width=True);insight(f"{top.label} is the most common work mode for {dept} ({top.value:,.0f}).")
+elif user["role"] == "MANAGER":
+    st.info("Demographic breakdowns are hidden in the manager persona.")
+
+st.subheader("Five questions this page answers")
+st.markdown("1. What is month-end headcount, and how is it changing?\n2. Which departments have the largest workforces?\n3. How many people joined or left in the selected month?\n4. Which location tier is largest?\n5. Which work mode is most common?")
+st.caption("Filters use the governed metric layer. Minimum group sizes are enforced before demographic breakdowns are returned.")

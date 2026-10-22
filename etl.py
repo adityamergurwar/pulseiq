@@ -1,254 +1,391 @@
-"""Repeatable PulseIQ load, contract validation, warehouse build and DQ run."""
+"""One-command, rerunnable PulseIQ data build with row-level audit evidence."""
 from __future__ import annotations
 
+import argparse
 import csv
 import json
 import re
 import sys
-from datetime import datetime, timezone
+import uuid
+from datetime import date, datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import duckdb
+import pandas as pd
+
+from pulseiq.metrics import create_metric_views
+from pulseiq.quality import run_quality_checks
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "03_Data" / "csv"
-DB = ROOT / "pulseiq.duckdb"
+DB = Path(__import__("os").environ.get("PULSEIQ_DB_PATH", ROOT / "pulseiq.duckdb"))
+
 CONTRACT_FEEDS = {
     "fact_anomaly": "AI anomaly results (fact_anomaly)",
     "fact_attrition_risk": "AI attrition risk (fact_attrition_risk)",
     "fact_forecast": "AI forecast (fact_forecast)",
     "fact_task": "Task board (fact_task)",
 }
+PRIMARY_KEYS = {
+    "dim_account": ["account_code"], "dim_client": ["client_id"], "dim_date": ["date_key"],
+    "dim_department": ["department_id"], "dim_employee": ["employee_key"],
+    "dim_leave_type": ["leave_type_code"], "dim_location": ["work_location"],
+    "dim_role": ["role_id"], "dim_sprint": ["sprint_id"], "dim_team": ["team_id"],
+    "dim_vendor": ["vendor_id"], "fact_anomaly": ["result_id"],
+    "fact_attendance_monthly": ["attendance_fact_id"], "fact_attrition_risk": ["prediction_id"],
+    "fact_expense": ["expense_id"], "fact_forecast": ["forecast_id"],
+    "fact_headcount_monthly": ["date_key", "department_id"],
+    "fact_invoice_payment": ["payment_id"], "fact_invoice": ["invoice_id"],
+    "fact_leave": ["leave_request_id"], "fact_ledger": ["line_id"],
+    "fact_payroll": ["payroll_item_id"], "fact_task": ["task_id"],
+}
+WAREHOUSE_TABLES = sorted((*PRIMARY_KEYS.keys(),))
 
 
 def qid(value: str) -> str:
     return '"' + value.replace('"', '""') + '"'
 
 
-def load_contracts():
-    contracts = {}
-    with (DATA / "data_contracts.csv").open(encoding="utf-8-sig", newline="") as f:
-        for row in csv.DictReader(f):
-            contracts.setdefault(row["feed"], []).append(row)
-    return contracts
+def is_blank(value: Any) -> bool:
+    if value is None:
+        return True
+    try:
+        return bool(pd.isna(value))
+    except (TypeError, ValueError):
+        return isinstance(value, str) and not value.strip()
 
 
-def validate_table(table: str, rows: list[dict], columns: list[str], contracts: dict):
+def serializable(value: Any) -> Any:
+    if is_blank(value):
+        return None
+    if isinstance(value, (datetime, date, pd.Timestamp)):
+        return value.isoformat()
+    if hasattr(value, "item"):
+        return value.item()
+    return value
+
+
+def load_contracts(data_dir: Path = DATA) -> dict[str, list[dict[str, str]]]:
+    output: dict[str, list[dict[str, str]]] = {}
+    with (data_dir / "data_contracts.csv").open(encoding="utf-8-sig", newline="") as stream:
+        for row in csv.DictReader(stream):
+            output.setdefault(row["feed"], []).append(row)
+    return output
+
+
+def _expected_type(kind: str) -> str:
+    kind = str(kind).strip().lower()
+    if kind == "integer":
+        return "integer"
+    if kind == "decimal":
+        return "decimal"
+    if kind == "date":
+        return "date"
+    if kind == "timestamp":
+        return "timestamp"
+    return "text"
+
+
+def _valid_type(value: Any, kind: str) -> bool:
+    kind = _expected_type(kind)
+    if kind == "text":
+        return True
+    if kind == "integer":
+        try:
+            return float(value).is_integer()
+        except (ValueError, TypeError, OverflowError):
+            return False
+    if kind == "decimal":
+        try:
+            float(value)
+            return True
+        except (ValueError, TypeError, OverflowError):
+            return False
+    if kind == "date":
+        if isinstance(value, (date, datetime, pd.Timestamp)):
+            return True
+        try:
+            datetime.fromisoformat(str(value)[:10])
+            return True
+        except ValueError:
+            return False
+    if kind == "timestamp":
+        if isinstance(value, (datetime, pd.Timestamp)):
+            return True
+        try:
+            datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            return True
+        except ValueError:
+            return False
+    return True
+
+
+def _contract_issues(table: str, row: dict[str, Any], columns: list[str], contracts: dict) -> list[str]:
     feed = CONTRACT_FEEDS.get(table)
-    rules = {r["column_name"]: r for r in contracts.get(feed, [])} if feed else {}
-    if not rules:
-        return rows, []
-    reasons, passed = [], []
-    for n, row in enumerate(rows, start=1):
-        issues = []
-        for col, spec in rules.items():
-            if col not in columns and ".." not in col:
-                issues.append(f"missing contract column {col}"); continue
-            targets = [f"top_reason_{i}" for i in (1, 2, 3)] if col == "top_reason_1..3" else [col]
-            for target in targets:
-                val = row.get(target)
-                blank = val is None or str(val).strip() == ""
-                if blank and spec["nullable"].lower() == "no":
-                    issues.append(f"{target} is required"); continue
-                if blank: continue
-                typ = spec["data_type"].lower()
-                try:
-                    if typ in ("int", "integer"):
-                        if not float(val).is_integer(): raise ValueError("not integral")
-                        int(float(val))
-                    elif "decimal" in typ or typ in ("float", "numeric"):
-                        float(val)
-                    elif typ == "date":
-                        datetime.fromisoformat(str(val)[:10])
-                    elif typ == "timestamp":
-                        datetime.fromisoformat(str(val).replace("Z", "+00:00"))
-                except (ValueError, TypeError):
-                    issues.append(f"{target} violates {spec['data_type']}"); continue
-                rule = spec["rule_or_allowed_values"].lower()
-                if "0 to 1" in rule and not 0 <= float(val) <= 1: issues.append(f"{target} must be between 0 and 1")
-                elif rule.startswith(">= 0") and float(val) < 0: issues.append(f"{target} must be >= 0")
-                elif rule.startswith("<= forecast_value") and float(val) > float(row["forecast_value"]): issues.append(f"{target} exceeds forecast_value")
-                elif rule.startswith(">= forecast_value") and float(val) < float(row["forecast_value"]): issues.append(f"{target} below forecast_value")
-                elif " | " in rule and rule.split(" | ")[0] not in ("Y", "N"):
-                    allowed = {x.strip() for x in re.split(r"\s*\|\s*", spec["rule_or_allowed_values"]) if x.strip()}
-                    if str(val) not in allowed and not rule.startswith("exists in") and not rule.startswith("month end"):
-                        issues.append(f"{target} not in allowed values")
-                elif "an-nnnn" in rule and not re.fullmatch(r"AN-\d{4}", str(val)): issues.append(f"{target} must match AN-nnnn")
-                elif "ar-nnnn" in rule and not re.fullmatch(r"AR-\d{4}", str(val)): issues.append(f"{target} must match AR-nnnn")
-                elif "fc-nnnn" in rule and not re.fullmatch(r"FC-\d{4}", str(val)): issues.append(f"{target} must match FC-nnnn")
-                elif "task-nnnnn" in rule and not re.fullmatch(r"TASK-\d{5}", str(val)): issues.append(f"{target} must match TASK-nnnnn")
-                elif rule == "y or n" and str(val) not in {"Y", "N"}: issues.append(f"{target} must be Y or N")
-                elif rule.startswith("1,2,3,5") and int(float(val)) not in {1,2,3,5,8,13}: issues.append(f"{target} must be a Fibonacci story point")
-                elif rule == "p1..p4" and str(val) not in {"P1","P2","P3","P4"}: issues.append(f"{target} must be P1 to P4")
-        if table == "fact_task":
-            if row.get("started_date") and row.get("created_date") and row["created_date"] > row["started_date"]: issues.append("created_date must not follow started_date")
-            if row.get("started_date") in (None, "") and row.get("status") != "To Do": issues.append("started_date may be blank only for To Do")
-            if row.get("status") == "Done" and not row.get("completed_date"): issues.append("completed_date is required for Done tasks")
-            if row.get("started_date") and row.get("completed_date") and row["completed_date"] < row["started_date"]: issues.append("completed_date must not precede started_date")
-        if issues: reasons.append((n, row, "; ".join(issues)))
-        else: passed.append(row)
-    # Uniqueness is a feed-level promise for the declared identifier.
-    unique_cols = [c for c, spec in rules.items() if "unique" in spec["rule_or_allowed_values"].lower()]
-    passed_ids = {id(row) for row in passed}
-    unique_reasons = {}
-    for col in unique_cols:
-        seen = set()
-        for n, row in enumerate(rows, start=1):
-            val = row.get(col)
-            if val in seen and id(row) in passed_ids:
-                unique_reasons.setdefault(n, []).append(f"{col} duplicates {val}")
-            seen.add(val)
-    for n, row in enumerate(rows, start=1):
-        if n in unique_reasons: reasons.append((n, row, "; ".join(unique_reasons[n])))
-    if unique_reasons:
-        duplicate_ids = {id(rows[n-1]) for n in unique_reasons}
-        passed = [row for row in passed if id(row) not in duplicate_ids]
-    return passed, reasons
+    rules = contracts.get(feed, []) if feed else []
+    issues: list[str] = []
+    for spec in rules:
+        col = spec["column_name"]
+        targets = [f"top_reason_{i}" for i in (1, 2, 3)] if col == "top_reason_1..3" else [col]
+        for target in targets:
+            if target not in columns:
+                issues.append(f"missing contract column {target}")
+                continue
+            value = row.get(target)
+            blank = is_blank(value)
+            nullable = str(spec["nullable"]).strip().lower() in {"yes", "y", "true", "1"}
+            if blank:
+                if not nullable:
+                    issues.append(f"{target} is required")
+                continue
+            kind = spec["data_type"].strip().lower()
+            if not _valid_type(value, kind):
+                issues.append(f"{target} violates {spec['data_type']}")
+                continue
+            rule = spec["rule_or_allowed_values"].strip()
+            low_rule = rule.lower()
+            sval = str(value).strip()
+            if low_rule == "0 to 1" and not 0 <= float(value) <= 1:
+                issues.append(f"{target} must be between 0 and 1")
+            elif low_rule.startswith(">= 0") and float(value) < 0:
+                issues.append(f"{target} must be >= 0")
+            elif "<= forecast_value" in low_rule and float(value) > float(row["forecast_value"]):
+                issues.append(f"{target} exceeds forecast_value")
+            elif ">= forecast_value" in low_rule and float(value) < float(row["forecast_value"]):
+                issues.append(f"{target} below forecast_value")
+            elif low_rule in {"y or n", "y/n"} and sval not in {"Y", "N"}:
+                issues.append(f"{target} must be Y or N")
+            elif "|" in rule and not low_rule.startswith(("exists in", "month end")):
+                allowed = {part.strip() for part in rule.split("|")}
+                if sval not in allowed:
+                    issues.append(f"{target} not in allowed values")
+            elif "an-nnnn" in low_rule and not re.fullmatch(r"AN-\d{4}", sval):
+                issues.append(f"{target} must match AN-nnnn")
+            elif "ar-nnnn" in low_rule and not re.fullmatch(r"AR-\d{4}", sval):
+                issues.append(f"{target} must match AR-nnnn")
+            elif "fc-nnnn" in low_rule and not re.fullmatch(r"FC-\d{4}", sval):
+                issues.append(f"{target} must match FC-nnnn")
+            elif "task-nnnnn" in low_rule and not re.fullmatch(r"TASK-\d{5}", sval):
+                issues.append(f"{target} must match TASK-nnnnn")
+            elif low_rule.startswith("1,2,3,5") and int(float(value)) not in {1, 2, 3, 5, 8, 13}:
+                issues.append(f"{target} must be a Fibonacci story point")
+            elif low_rule == "p1..p4" and sval not in {"P1", "P2", "P3", "P4"}:
+                issues.append(f"{target} must be P1 to P4")
+    if table == "fact_task":
+        created, started, completed, status = (row.get(c) for c in ("created_date", "started_date", "completed_date", "status"))
+        if not any(is_blank(v) for v in (created, started)) and created > started:
+            issues.append("created_date must not follow started_date")
+        if is_blank(started) and status != "To Do":
+            issues.append("started_date may be blank only for To Do")
+        if status == "Done" and is_blank(completed):
+            issues.append("completed_date is required for Done tasks")
+        if not any(is_blank(v) for v in (started, completed)) and completed < started:
+            issues.append("completed_date must not precede started_date")
+    return list(dict.fromkeys(issues))
 
 
-def build_views(con):
-    # Governed views follow the supplied metric dictionary and expose a consistent date/department grain when defined.
-    sql = {
-      "m01_headcount": "SELECT month_start_date, department_id, headcount_end AS value FROM clean.fact_headcount_monthly WHERE headcount_end>=5 UNION ALL SELECT month_start_date, 'ALL' AS department_id, SUM(headcount_end) AS value FROM clean.fact_headcount_monthly GROUP BY 1",
-      "m02_hires": "SELECT h.month_start_date, h.department_id, h.hires AS value FROM clean.fact_headcount_monthly h WHERE h.headcount_end>=5 UNION ALL SELECT month_start_date, 'ALL' AS department_id, SUM(hires) AS value FROM clean.fact_headcount_monthly GROUP BY 1",
-      "m03_exits": "SELECT h.month_start_date, h.department_id, h.exits AS value FROM clean.fact_headcount_monthly h WHERE h.headcount_end>=5 UNION ALL SELECT month_start_date, 'ALL' AS department_id, SUM(exits) AS value FROM clean.fact_headcount_monthly GROUP BY 1",
-      "m04_attrition_monthly": "SELECT month_start_date, department_id, attrition_rate_monthly_pct AS value FROM clean.fact_headcount_monthly WHERE headcount_end>=10 UNION ALL SELECT month_start_date, 'ALL' AS department_id, 100.0*SUM(exits)/NULLIF(SUM(headcount_start),0) AS value FROM clean.fact_headcount_monthly GROUP BY 1",
-      "m05_attrition_rolling_12m": "SELECT month_start_date, department_id, 100.0 * SUM(exits) OVER (PARTITION BY department_id ORDER BY month_start_date ROWS BETWEEN 11 PRECEDING AND CURRENT ROW) / NULLIF(AVG(headcount_end) OVER (PARTITION BY department_id ORDER BY month_start_date ROWS BETWEEN 11 PRECEDING AND CURRENT ROW),0) AS value FROM clean.fact_headcount_monthly QUALIFY AVG(headcount_end) OVER (PARTITION BY department_id ORDER BY month_start_date ROWS BETWEEN 11 PRECEDING AND CURRENT ROW)>=10",
-      "m06_voluntary_attrition": "SELECT month_start_date, department_id, 100.0 * SUM(voluntary_exits) OVER (PARTITION BY department_id ORDER BY month_start_date ROWS BETWEEN 11 PRECEDING AND CURRENT ROW) / NULLIF(AVG(headcount_end) OVER (PARTITION BY department_id ORDER BY month_start_date ROWS BETWEEN 11 PRECEDING AND CURRENT ROW),0) AS value FROM clean.fact_headcount_monthly QUALIFY AVG(headcount_end) OVER (PARTITION BY department_id ORDER BY month_start_date ROWS BETWEEN 11 PRECEDING AND CURRENT ROW)>=10",
-      "m07_gross_pay": "SELECT period_end_date AS month, department_id, SUM(gross_pay) AS value FROM clean.fact_payroll GROUP BY 1,2 HAVING COUNT(DISTINCT employee_id)>=5",
-      "m08_net_pay": "SELECT period_end_date AS month, department_id, SUM(net_pay) AS value FROM clean.fact_payroll GROUP BY 1,2 HAVING COUNT(DISTINCT employee_id)>=5",
-      "m09_payroll_cost": "SELECT period_end_date AS month, department_id, SUM(employer_cost) AS value FROM clean.fact_payroll GROUP BY 1,2 HAVING COUNT(DISTINCT employee_id)>=5",
-      "m10_cost_per_head": "SELECT period_end_date AS month, department_id, SUM(employer_cost)/NULLIF(COUNT(DISTINCT employee_id),0) AS value FROM clean.fact_payroll GROUP BY 1,2 HAVING COUNT(DISTINCT employee_id)>=5",
-      "m11_overtime_share": "SELECT period_end_date AS month, department_id, 100.0*SUM(overtime_pay)/NULLIF(SUM(employer_cost),0) AS value FROM clean.fact_payroll GROUP BY 1,2 HAVING COUNT(DISTINCT employee_id)>=5",
-      "m12_variable_pay_share": "SELECT period_end_date AS month, department_id, 100.0*SUM(variable_pay)/NULLIF(SUM(gross_pay),0) AS value FROM clean.fact_payroll GROUP BY 1,2 HAVING COUNT(DISTINCT employee_id)>=5",
-      "m13_attendance_rate": "SELECT period_end_date AS month, department_id, (SUM(present_days)+0.5*SUM(half_days_unpaid))/NULLIF(SUM(scheduled_days),0) AS value FROM clean.fact_attendance_monthly GROUP BY 1,2 HAVING COUNT(DISTINCT employee_id)>=5",
-      "m14_late_arrival_rate": "SELECT period_end_date AS month, department_id, SUM(late_arrivals)/NULLIF(SUM(present_days),0) AS value FROM clean.fact_attendance_monthly GROUP BY 1,2 HAVING COUNT(DISTINCT employee_id)>=5",
-      "m15_lop_days": "SELECT period_end_date AS month, department_id, SUM(lop_days) AS value FROM clean.fact_payroll GROUP BY 1,2 HAVING COUNT(DISTINCT employee_id)>=5",
-      "m16_revenue": "SELECT CAST(date_trunc('month',entry_date) AS DATE) AS month, -SUM(signed_amount_debit_positive) AS value FROM clean.fact_ledger WHERE account_code BETWEEN '4001' AND '4004' GROUP BY 1",
-      "m17_net_profit": "SELECT CAST(date_trunc('month',entry_date) AS DATE) AS month, -SUM(signed_amount_debit_positive) AS value FROM clean.fact_ledger WHERE account_code LIKE '4%' OR account_code LIKE '5%' GROUP BY 1",
-      "m18_operating_margin": "SELECT CAST(date_trunc('month',entry_date) AS DATE) AS month, -100.0*SUM(CASE WHEN account_code LIKE '4%' OR account_code LIKE '5%' THEN signed_amount_debit_positive ELSE 0 END)/NULLIF(-SUM(CASE WHEN account_code BETWEEN '4001' AND '4004' THEN signed_amount_debit_positive ELSE 0 END),0) AS value FROM clean.fact_ledger GROUP BY 1",
-      "m19_payroll_pct_revenue": "SELECT p.month, 100.0*p.cost/NULLIF(r.revenue,0) AS value FROM (SELECT CAST(date_trunc('month',entry_date) AS DATE) month, -SUM(signed_amount_debit_positive) cost FROM clean.fact_ledger WHERE account_code BETWEEN '5001' AND '5005' GROUP BY 1) p JOIN (SELECT CAST(date_trunc('month',entry_date) AS DATE) month, -SUM(signed_amount_debit_positive) revenue FROM clean.fact_ledger WHERE account_code BETWEEN '4001' AND '4004' GROUP BY 1) r USING(month)",
-      "m20_dso": "WITH months AS (SELECT month_end_date AS month FROM clean.dim_date WHERE is_month_end='Y' GROUP BY 1), ar AS (SELECT m.month, SUM(GREATEST(i.total_amount-COALESCE((SELECT SUM(p.amount) FROM clean.fact_invoice_payment p WHERE p.invoice_id=i.invoice_id AND p.payment_date<=m.month),0),0)) AS receivables FROM months m JOIN clean.fact_invoice i ON i.invoice_date<=m.month AND i.status NOT IN ('DRAFT','CANCELLED') GROUP BY 1), sales AS (SELECT m.month, SUM(i.total_amount) AS sales_90d FROM months m JOIN clean.fact_invoice i ON i.invoice_date<=m.month AND i.invoice_date>m.month-INTERVAL 90 DAY AND i.status NOT IN ('DRAFT','CANCELLED') GROUP BY 1) SELECT ar.month, 90.0*ar.receivables/NULLIF(sales.sales_90d,0) AS value FROM ar JOIN sales USING(month)",
-      "m21_overdue_receivables": "WITH months AS (SELECT month_end_date AS month FROM clean.dim_date WHERE is_month_end='Y' GROUP BY 1) SELECT m.month, SUM(GREATEST(i.total_amount-COALESCE((SELECT SUM(p.amount) FROM clean.fact_invoice_payment p WHERE p.invoice_id=i.invoice_id AND p.payment_date<=m.month),0),0)) AS value FROM months m JOIN clean.fact_invoice i ON i.due_date<m.month AND i.invoice_date<=m.month AND i.status NOT IN ('DRAFT','CANCELLED') GROUP BY 1",
-      "m22_task_completion": "SELECT s.sprint_id, t.team_id, 100.0*COUNT(*) FILTER(WHERE t.status='Done')/NULLIF(COUNT(*) FILTER(WHERE t.status!='Cancelled'),0) AS value FROM clean.fact_task t JOIN clean.dim_sprint s USING(sprint_id) GROUP BY 1,2 HAVING COUNT(*) FILTER(WHERE t.status!='Cancelled')>=5",
-      "m23_on_time_delivery": "SELECT sprint_id, team_id, 100.0*COUNT(*) FILTER(WHERE completed_on_time='Y')/NULLIF(COUNT(*) FILTER(WHERE status='Done'),0) AS value FROM clean.fact_task GROUP BY 1,2 HAVING COUNT(*) FILTER(WHERE status='Done')>=5",
-      "m24_velocity": "SELECT sprint_id, team_id, SUM(story_points) FILTER(WHERE status='Done') AS value FROM clean.fact_task GROUP BY 1,2",
-      "m25_cycle_time": "SELECT sprint_id, team_id, AVG(cycle_time_days) FILTER(WHERE status='Done') AS value FROM clean.fact_task GROUP BY 1,2 HAVING COUNT(*) FILTER(WHERE status='Done')>=5",
-       "m26_anomaly_flag_rate": "SELECT source_dataset, CAST(date_trunc('month',period) AS DATE) AS month, 100.0*AVG(CASE WHEN flagged='Y' THEN 1.0 ELSE 0 END) AS value FROM clean.fact_anomaly GROUP BY 1,2",
-      "m27_high_risk_share": "SELECT department_id, 100.0*AVG(CASE WHEN risk_band='High' THEN 1.0 ELSE 0 END) AS value FROM clean.fact_attrition_risk GROUP BY 1 HAVING COUNT(DISTINCT employee_id)>=10",
-      "m28_forecast_error": "SELECT f.department_id, f.forecast_month, AVG(CASE WHEN f.metric='headcount_end' THEN ABS(f.forecast_value-h.headcount_end)/NULLIF(h.headcount_end,0) ELSE ABS(f.forecast_value-h.attrition_rate_monthly_pct)/NULLIF(h.attrition_rate_monthly_pct,0) END)*100 AS value FROM clean.fact_forecast f JOIN clean.fact_headcount_monthly h ON f.department_id=h.department_id AND f.forecast_month=h.month_start_date GROUP BY 1,2",
-    }
-    for name, query in sql.items():
-        con.execute(f"CREATE OR REPLACE VIEW metrics.{name} AS {query}")
-    con.execute("""CREATE OR REPLACE VIEW metrics.dashboard_department_mix AS
-        SELECT h.month_start_date, h.department_id, d.department_name, h.headcount_end AS value
-        FROM clean.fact_headcount_monthly h JOIN clean.dim_department d USING(department_id)
-        WHERE h.department_id <> 'D00' AND h.headcount_end >= 5""")
-    con.execute("""CREATE OR REPLACE VIEW metrics.dashboard_location_tier AS
-        WITH snapshot AS (SELECT month_start_date, CAST(month_start_date + INTERVAL 1 MONTH - INTERVAL 1 DAY AS DATE) month_end FROM clean.fact_headcount_monthly GROUP BY 1), people AS (
-          SELECT s.month_start_date,e.department_id,e.employee_id,l.city_tier AS label FROM snapshot s JOIN clean.dim_employee e ON CAST(e.valid_from AS DATE)<=s.month_end AND CAST(e.valid_to AS DATE)>=s.month_end JOIN clean.dim_location l ON l.work_location=e.work_location WHERE e.department_id<>'D00')
-        SELECT month_start_date,department_id,label,COUNT(DISTINCT employee_id) value FROM people GROUP BY 1,2,3 HAVING COUNT(DISTINCT employee_id)>=5
-        UNION ALL SELECT month_start_date,'ALL' AS department_id,label,COUNT(DISTINCT employee_id) value FROM people GROUP BY 1,3 HAVING COUNT(DISTINCT employee_id)>=5""")
-    con.execute("""CREATE OR REPLACE VIEW metrics.dashboard_work_mode AS
-        WITH snapshot AS (SELECT month_start_date, CAST(month_start_date + INTERVAL 1 MONTH - INTERVAL 1 DAY AS DATE) month_end FROM clean.fact_headcount_monthly GROUP BY 1), people AS (
-          SELECT s.month_start_date,e.department_id,e.employee_id,e.work_mode AS label FROM snapshot s JOIN clean.dim_employee e ON CAST(e.valid_from AS DATE)<=s.month_end AND CAST(e.valid_to AS DATE)>=s.month_end WHERE e.department_id<>'D00')
-        SELECT month_start_date,department_id,label,COUNT(DISTINCT employee_id) value FROM people GROUP BY 1,2,3 HAVING COUNT(DISTINCT employee_id)>=5
-        UNION ALL SELECT month_start_date,'ALL' AS department_id,label,COUNT(DISTINCT employee_id) value FROM people GROUP BY 1,3 HAVING COUNT(DISTINCT employee_id)>=5""")
-    con.execute("CREATE OR REPLACE VIEW metrics.metric_catalog AS SELECT metric_id, metric_name, business_definition, source_table, owner_team, minimum_group_size FROM raw.metric_dictionary")
-    return sql
+def _read_dictionary(con) -> dict[str, dict[str, dict[str, Any]]]:
+    if not con.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='raw' AND table_name='data_dictionary'").fetchone()[0]:
+        return {}
+    rows = con.execute("SELECT sheet,\"column\",data_type FROM raw.data_dictionary").fetchall()
+    output: dict[str, dict[str, dict[str, Any]]] = {}
+    for sheet, column, kind in rows:
+        required = False
+        if con.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='raw' AND table_name=?",[sheet]).fetchone()[0]:
+            actual_nulls=con.execute(f"SELECT COUNT(*) FROM raw.{qid(sheet)} WHERE {qid(column)} IS NULL").fetchone()[0]
+            required = actual_nulls == 0
+        output.setdefault(sheet, {})[column] = {"data_type": kind, "required": required}
+    return output
 
 
-def run():
-    if not DATA.exists(): raise FileNotFoundError(f"Expected CSV bundle at {DATA}")
-    con = duckdb.connect(str(DB))
-    con.execute("CREATE SCHEMA IF NOT EXISTS raw; CREATE SCHEMA IF NOT EXISTS clean; CREATE SCHEMA IF NOT EXISTS warehouse; CREATE SCHEMA IF NOT EXISTS metrics; CREATE SCHEMA IF NOT EXISTS audit")
-    contracts = load_contracts()
-    results = []
-    run_id = datetime.now(timezone.utc).isoformat()
-    for path in sorted(DATA.glob("*.csv")):
-        table = path.stem
-        if table == "data_contracts":
-            con.execute(f"CREATE OR REPLACE TABLE raw.{qid(table)} AS SELECT * FROM read_csv_auto(?, header=true)", [str(path)])
+def _row_schema_issues(row: dict[str, Any], specs: dict[str, dict[str, Any]]) -> list[str]:
+    issues = []
+    for column, spec in specs.items():
+        value = row.get(column)
+        if is_blank(value):
+            if spec["required"]:
+                issues.append(f"{column} is required by the source dictionary")
             continue
-        con.execute(f"CREATE OR REPLACE TABLE raw.{qid(table)} AS SELECT * FROM read_csv_auto(?, header=true, all_varchar=false)", [str(path)])
-        rows = con.execute(f"SELECT * FROM raw.{qid(table)}").fetchdf().to_dict("records")
-        columns = [r[0] for r in con.execute(f"DESCRIBE raw.{qid(table)}").fetchall()]
-        feed = CONTRACT_FEEDS.get(table)
-        if feed:
-            expected = {r["column_name"] for r in contracts.get(feed, []) if ".." not in r["column_name"]}
-            if "top_reason_1..3" in {r["column_name"] for r in contracts.get(feed, [])}:
-                expected.update({"top_reason_1", "top_reason_2", "top_reason_3"})
-            missing = sorted(expected - set(columns))
-            if missing: raise RuntimeError(f"{table} is missing contracted columns: {', '.join(missing)}")
-        passed, rejected = validate_table(table, rows, columns, contracts)
-        if feed:
-            contracted_columns = {r["column_name"] for r in contracts.get(feed, []) if ".." not in r["column_name"]}
-            if "top_reason_1..3" in {r["column_name"] for r in contracts.get(feed, [])}:
-                contracted_columns.update({"top_reason_1", "top_reason_2", "top_reason_3"})
-            unexpected = sorted(set(columns) - contracted_columns)
-            if unexpected: print(f"WARNING {table}: unexpected columns retained for review: {', '.join(unexpected)}")
-        fk_specs = {
-            "fact_task": [("team_id","dim_team","team_id"),("sprint_id","dim_sprint","sprint_id"),("assignee_employee_id","dim_employee","employee_id")],
-            "fact_attrition_risk": [("employee_id","dim_employee","employee_id"),("department_id","dim_department","department_id")],
-            "fact_forecast": [("department_id","dim_department","department_id")],
-            "fact_anomaly": [("employee_id","dim_employee","employee_id")],
-        }
-        fk_columns = fk_specs.get(table, [])
-        if fk_columns:
-            pass_ids = {id(row) for row in passed}
-            fk_bad = []
-            new_passed = []
-            known_by_column = {}
-            for col, dim_table, dim_col in fk_columns:
-                known = {str(v[0]) for v in con.execute(f"SELECT {qid(dim_col)} FROM raw.{qid(dim_table)}").fetchall()}
-                if table == "fact_forecast" and col == "department_id": known.add("ALL")
-                known_by_column[col] = (known, dim_table, dim_col)
-            sprint_ends = {}
-            if table == "fact_task":
-                sprint_ends = {str(sid): str(end)[:10] for sid,end in con.execute("SELECT sprint_id,end_date FROM raw.dim_sprint").fetchall()}
-            for row_no, row in enumerate(rows, start=1):
-                if id(row) not in pass_ids: continue
-                missing = [(col, dim_table, dim_col) for col,(known,dim_table,dim_col) in known_by_column.items() if str(row.get(col)) not in known]
-                if missing:
-                    col, dim_table, dim_col = missing[0]
-                    fk_bad.append((row_no,row,f"{col} {row.get(col)} has no match in {dim_table}.{dim_col}"))
-                elif table == "fact_task" and str(row.get("due_date"))[:10] != sprint_ends.get(str(row.get("sprint_id"))):
-                    fk_bad.append((row_no,row,"due_date must match the sprint end date"))
-                else: new_passed.append(row)
-            rejected.extend(fk_bad)
-            passed=new_passed
-        # All tables are materialized to clean; contract failures are excluded. Uncontracted tables pass through unchanged.
-        con.execute(f"CREATE OR REPLACE TABLE clean.{qid(table)} AS SELECT * FROM raw.{qid(table)}")
-        if rejected:
-            con.register("_passed_rows", __import__('pandas').DataFrame(passed, columns=columns))
-            con.execute(f"CREATE OR REPLACE TABLE clean.{qid(table)} AS SELECT * FROM _passed_rows")
-            con.unregister("_passed_rows")
-        for row_no, row, reason in rejected:
-            con.execute("INSERT INTO audit.quarantine SELECT ?, ?, ?, ?, ?", [run_id, table, row_no, json.dumps(row, default=str), reason]) if con.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='audit' AND table_name='quarantine'").fetchone()[0] else con.execute("CREATE TABLE audit.quarantine(run_id VARCHAR, source_table VARCHAR, source_row BIGINT, row_json JSON, reason VARCHAR)")
-            if con.execute("SELECT COUNT(*) FROM audit.quarantine WHERE run_id=? AND source_table=? AND source_row=?", [run_id,table,row_no]).fetchone()[0] == 0:
-                con.execute("INSERT INTO audit.quarantine VALUES (?, ?, ?, ?, ?)", [run_id, table, row_no, json.dumps(row, default=str), reason])
-        results.append((table, len(rows), len(passed), len(rejected)))
-    con.execute("CREATE TABLE IF NOT EXISTS audit.quarantine(run_id VARCHAR, source_table VARCHAR, source_row BIGINT, row_json JSON, reason VARCHAR)")
-    con.execute("CREATE OR REPLACE TABLE audit.load_summary AS SELECT * FROM (VALUES " + ",".join("(?,?,?,?)" for _ in results) + ") t(table_name, rows_in, rows_passed, rows_quarantined)", [v for row in results for v in row])
-    # Star-schema base: preserve source keys, and retain employee surrogate history for month-correct joins.
-    primary_keys = {
-      "dim_account": ["account_code"], "dim_client": ["client_id"], "dim_date": ["date_key"],
-      "dim_department": ["department_id"], "dim_employee": ["employee_key"], "dim_leave_type": ["leave_type_code"],
-      "dim_location": ["work_location"], "dim_role": ["role_id"], "dim_sprint": ["sprint_id"],
-      "dim_team": ["team_id"], "dim_vendor": ["vendor_id"], "fact_anomaly": ["result_id"],
-      "fact_attendance_monthly": ["attendance_fact_id"], "fact_attrition_risk": ["prediction_id"],
-      "fact_expense": ["expense_id"], "fact_forecast": ["forecast_id"],
-      "fact_headcount_monthly": ["date_key", "department_id"], "fact_invoice_payment": ["payment_id"],
-      "fact_invoice": ["invoice_id"], "fact_leave": ["leave_request_id"], "fact_ledger": ["line_id"],
-      "fact_payroll": ["payroll_item_id"], "fact_task": ["task_id"],
-    }
-    for t in [p.stem for p in DATA.glob("dim_*.csv")] + [p.stem for p in DATA.glob("fact_*.csv")]:
-        desc = con.execute(f"DESCRIBE clean.{qid(t)}").fetchall()
-        cols = ", ".join(f"{qid(col[0])} {col[1]}" for col in desc)
-        pk = ", ".join(qid(col) for col in primary_keys[t])
-        con.execute(f"CREATE OR REPLACE TABLE warehouse.{qid(t)} ({cols}, PRIMARY KEY ({pk}))")
-        con.execute(f"INSERT INTO warehouse.{qid(t)} SELECT * FROM clean.{qid(t)}")
-    build_views(con)
+        if not _valid_type(value, spec["data_type"]):
+            issues.append(f"{column} violates source type {spec['data_type']}")
+    return issues
+
+
+def _schema_contracts(con, dictionary: dict[str, dict[str, dict[str, Any]]], source_columns: dict[str, list[str]]) -> None:
+    con.execute("""CREATE OR REPLACE TABLE audit.schema_contract_results(
+      table_name VARCHAR,column_name VARCHAR,expected_type VARCHAR,actual_type VARCHAR,
+      nullable_expected BOOLEAN,actual_nulls BIGINT,status VARCHAR,detail VARCHAR)""")
+    out=[]
+    for table, specs in dictionary.items():
+        if table not in source_columns or table not in PRIMARY_KEYS:
+            continue
+        actual_cols = set(source_columns[table])
+        desc = {r[0]: r[1] for r in con.execute(f"DESCRIBE raw.{qid(table)}").fetchall()}
+        missing = set(specs) - actual_cols
+        for col, spec in specs.items():
+            if col not in desc:
+                out.append((table,col,str(spec['data_type']),None,not spec['required'],None,'FAIL','Expected column is absent'))
+                continue
+            nulls = int(con.execute(f"SELECT COUNT(*) FROM raw.{qid(table)} WHERE {qid(col)} IS NULL").fetchone()[0])
+            status = 'PASS'
+            detail = ''
+            if spec['required'] and nulls:
+                status,detail='FAIL',f'{nulls} null values in a required column'
+            kind = _expected_type(spec['data_type'])
+            cast_type = {'text':'VARCHAR','integer':'BIGINT','decimal':'DOUBLE','date':'DATE','timestamp':'TIMESTAMP'}[kind]
+            value_sql = f"NULLIF(TRIM(CAST({qid(col)} AS VARCHAR)),'')"
+            if kind == 'integer':
+                invalid_expr=f"TRY_CAST({value_sql} AS DOUBLE) IS NULL OR TRY_CAST({value_sql} AS DOUBLE)<>FLOOR(TRY_CAST({value_sql} AS DOUBLE))"
+            else:
+                invalid_expr=f"TRY_CAST({value_sql} AS {cast_type}) IS NULL"
+            invalid=int(con.execute(f"SELECT COUNT(*) FROM raw.{qid(table)} WHERE {value_sql} IS NOT NULL AND ({invalid_expr})").fetchone()[0]) if kind!='text' else 0
+            if invalid:
+                status = 'WARN' if status != 'FAIL' else status
+                detail = (detail+'; ' if detail else '')+f'{invalid} nonblank values fail {spec["data_type"]} parsing; rows are quarantined'
+            out.append((table,col,str(spec['data_type']),str(desc[col]),not spec['required'],nulls,status,detail))
+        for col in sorted(actual_cols-set(specs)):
+            out.append((table,col,None,str(desc[col]),True,None,'WARN','Unexpected column retained in raw/clean; review schema drift'))
+    if out:
+        con.executemany("INSERT INTO audit.schema_contract_results VALUES (?,?,?,?,?,?,?,?)",out)
+
+
+def _create_audit_tables(con) -> None:
+    con.execute("CREATE SCHEMA IF NOT EXISTS raw; CREATE SCHEMA IF NOT EXISTS clean; CREATE SCHEMA IF NOT EXISTS warehouse; CREATE SCHEMA IF NOT EXISTS metrics; CREATE SCHEMA IF NOT EXISTS audit")
+    con.execute("""CREATE TABLE IF NOT EXISTS audit.quarantine(
+      run_id VARCHAR,source_table VARCHAR,source_row BIGINT,row_json JSON,reason VARCHAR)""")
+    con.execute("""CREATE TABLE IF NOT EXISTS audit.etl_run_log(
+      run_id VARCHAR,started_at TIMESTAMPTZ,finished_at TIMESTAMPTZ,status VARCHAR,error VARCHAR)""")
+
+
+def _add_unknown_employee(con) -> None:
+    cols = [r[0] for r in con.execute("DESCRIBE warehouse.dim_employee").fetchall()]
+    types = {r[0]: r[1] for r in con.execute("DESCRIBE warehouse.dim_employee").fetchall()}
+    values=[]
+    for col in cols:
+        if col == "employee_key": values.append("-1")
+        elif col == "employee_id": values.append("'UNKNOWN'")
+        elif col == "full_name": values.append("'Unknown employee'")
+        elif col == "valid_from": values.append("DATE '1900-01-01'")
+        elif col == "valid_to": values.append("DATE '9999-12-31'")
+        elif col == "is_current": values.append("'Y'")
+        elif col == "employment_status": values.append("'Unknown'")
+        elif col == "employment_type": values.append("'Unknown'")
+        elif col == "work_mode": values.append("'Unknown'")
+        elif types[col] in {"VARCHAR", "JSON"}: values.append("NULL")
+        else: values.append("NULL")
+    con.execute(f"INSERT INTO warehouse.dim_employee ({','.join(map(qid,cols))}) VALUES ({','.join(values)})")
+
+
+def _extend_forecast_calendar(con) -> None:
+    last_key = int(con.execute("SELECT MAX(forecast_month_key) FROM clean.fact_forecast").fetchone()[0])
+    max_date = con.execute("SELECT MAX(date) FROM warehouse.dim_date").fetchone()[0]
+    if max_date is None:
+        return
+    # Add calendar dates only when forecast keys require them. Source dimensions stay unchanged.
+    max_needed = con.execute("SELECT MAX(forecast_month_key) FROM clean.fact_forecast").fetchone()[0]
+    if max_needed is None:
+        return
+    needed_date = datetime.strptime(str(max_needed), "%Y%m%d").date()
+    if needed_date <= max_date:
+        return
+    con.execute("""INSERT INTO warehouse.dim_date
+      SELECT CAST(d AS DATE) AS date,CAST(strftime(d,'%Y%m%d') AS BIGINT) AS date_key,
+        year(d) AS year,quarter(d) AS quarter,month(d) AS month_number,
+        strftime(d,'%B') AS month_name,strftime(d,'%Y-%m') AS year_month,
+        weekofyear(d) AS week_of_year,strftime(d,'%A') AS day_of_week,
+        CASE WHEN dayofweek(d) IN (0,6) THEN 'Y' ELSE 'N' END AS is_weekend,
+        'N' AS is_holiday,CASE WHEN dayofweek(d) IN (0,6) THEN 'N' ELSE 'Y' END AS is_working_day,
+        CASE WHEN month(d)>=4 THEN 'FY'||year(d)||'-'||right(CAST(year(d)+1 AS VARCHAR),2)
+             ELSE 'FY'||(year(d)-1)||'-'||right(CAST(year(d) AS VARCHAR),2) END AS financial_year,
+        'Q'||CAST(CASE WHEN month(d)>=4 THEN ((month(d)-4)//3)+1 ELSE ((month(d)+8)//3)+1 END AS VARCHAR) AS fiscal_quarter,
+        ((month(d)+8)%12)+1 AS fiscal_month_number,
+        CASE WHEN d=last_day(d) THEN 'Y' ELSE 'N' END AS is_month_end,
+        CAST(date_trunc('month',d) AS DATE) AS month_start_date,last_day(d) AS month_end_date
+      FROM generate_series(?::DATE,?::DATE,INTERVAL 1 DAY) g(d)
+      WHERE CAST(strftime(d,'%Y%m%d') AS BIGINT) NOT IN (SELECT date_key FROM warehouse.dim_date)""", [max_date + pd.Timedelta(days=1), needed_date])
+
+
+def build_warehouse(con) -> None:
+    for table, keys in PRIMARY_KEYS.items():
+        if not con.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='clean' AND table_name=?",[table]).fetchone()[0]:
+            continue
+        desc = con.execute(f"DESCRIBE clean.{qid(table)}").fetchall()
+        definitions = ",".join(f"{qid(c)} {typ}" for c,typ,*_ in desc)
+        key_sql = ",".join(qid(k) for k in keys)
+        con.execute(f"CREATE OR REPLACE TABLE warehouse.{qid(table)} ({definitions},PRIMARY KEY ({key_sql}))")
+        con.execute(f"INSERT INTO warehouse.{qid(table)} SELECT * FROM clean.{qid(table)}")
+
+    # The supplied ledger has one explicitly identified, balanced payroll posting
+    # that is overstated by INR 18,450 on both sides of the journal entry.
+    # Correct it in the conformed warehouse and retain raw.fact_ledger unchanged.
+    corrections = [
+        ("JL-005614", "debit", 19891524.18, 19873074.18,
+         "DQ-04: reduce the D01 salary debit by INR 18,450; raw ledger retained."),
+        ("JL-005614", "signed_amount_debit_positive", 19891524.18, 19873074.18,
+         "DQ-04: reduce the D01 salary debit by INR 18,450; raw ledger retained."),
+        ("JL-005643", "credit", 47061928.45, 47043478.45,
+         "DQ-04: reduce the offsetting payroll payable credit by INR 18,450; raw ledger retained."),
+        ("JL-005643", "signed_amount_debit_positive", -47061928.45, -47043478.45,
+         "DQ-04: reduce the offsetting payroll payable credit by INR 18,450; raw ledger retained."),
+    ]
+    for line_id, field, source_value, corrected_value, _ in corrections:
+        actual = con.execute(f"SELECT {qid(field)} FROM raw.fact_ledger WHERE line_id=?", [line_id]).fetchall()
+        if len(actual) != 1 or abs(float(actual[0][0])-source_value)>0.005:
+            raise RuntimeError(f"Ledger correction precondition failed for {line_id}.{field}; inspect source drift")
+    con.execute("""CREATE OR REPLACE TABLE audit.ledger_corrections(
+      line_id VARCHAR,field_name VARCHAR,source_value DOUBLE,corrected_value DOUBLE,reason VARCHAR)""")
+    con.executemany("INSERT INTO audit.ledger_corrections VALUES (?,?,?,?,?)",corrections)
+    con.execute("""UPDATE warehouse.fact_ledger SET debit=debit-18450.00,
+      signed_amount_debit_positive=signed_amount_debit_positive-18450.00 WHERE line_id='JL-005614'""")
+    con.execute("""UPDATE warehouse.fact_ledger SET credit=credit-18450.00,
+      signed_amount_debit_positive=signed_amount_debit_positive+18450.00 WHERE line_id='JL-005643'""")
+
+    # Preserve source effective dates in clean and record the deterministic SCD repair in warehouse.
+    con.execute("""CREATE OR REPLACE TABLE audit.scd_repairs AS
+      WITH versions AS (
+        SELECT employee_key,employee_id,valid_to,
+          LEAD(valid_from) OVER(PARTITION BY employee_id ORDER BY valid_from,employee_key) AS next_valid_from
+        FROM clean.dim_employee
+      ) SELECT employee_key,employee_id,valid_to AS source_valid_to,
+        CAST(next_valid_from-INTERVAL 1 DAY AS DATE) AS repaired_valid_to,
+        'Closed overlap one day before the next effective version; clean source retained.' AS reason
+      FROM versions WHERE next_valid_from IS NOT NULL AND valid_to>=next_valid_from""")
+    con.execute("""UPDATE warehouse.dim_employee AS e SET valid_to=r.repaired_valid_to
+      FROM audit.scd_repairs r WHERE e.employee_key=r.employee_key""")
+
+    _add_unknown_employee(con)
+    for table in ("fact_payroll", "fact_attendance_monthly", "fact_leave", "fact_attrition_risk"):
+        if con.execute(f"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='warehouse' AND table_name='{table}'").fetchone()[0]:
+            con.execute(f"""UPDATE warehouse.{table} AS f SET employee_key=-1
+              WHERE NOT EXISTS(SELECT 1 FROM warehouse.dim_employee e WHERE e.employee_key=f.employee_key)""")
+    if con.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='warehouse' AND table_name='fact_task'").fetchone()[0]:
+        con.execute("ALTER TABLE warehouse.fact_task ADD COLUMN employee_key BIGINT")
+        con.execute("""UPDATE warehouse.fact_task AS t SET employee_key=COALESCE((
+          SELECT e.employee_key FROM warehouse.dim_employee e
+          WHERE e.employee_id=t.assignee_employee_id AND e.employee_id<>'UNKNOWN'
+            AND e.valid_from<=COALESCE(t.completed_date,t.started_date,t.created_date)
+            AND e.valid_to>=COALESCE(t.completed_date,t.started_date,t.created_date)
+          ORDER BY e.valid_from DESC,e.employee_key DESC LIMIT 1),-1)""")
+    if con.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='warehouse' AND table_name='fact_anomaly'").fetchone()[0]:
+        con.execute("ALTER TABLE warehouse.fact_anomaly ADD COLUMN employee_key BIGINT")
+        con.execute("""UPDATE warehouse.fact_anomaly AS a SET employee_key=COALESCE((
+          SELECT e.employee_key FROM warehouse.dim_employee e
+          WHERE e.employee_id=a.employee_id AND e.employee_id<>'UNKNOWN'
+            AND e.valid_from<=last_day(a.period) AND e.valid_to>=last_day(a.period)
+          ORDER BY e.valid_from DESC,e.employee_key DESC LIMIT 1),-1)""")
+    _extend_forecast_calendar(con)
+    con.execute("""CREATE OR REPLACE VIEW audit.payroll_ledger_reconciliation_clean AS
+      WITH p AS (SELECT CAST(date_trunc('month',period_end_date) AS DATE) AS period,SUM(employer_cost) AS payroll_cost
+                 FROM clean.fact_payroll GROUP BY 1),
+      l AS (SELECT CAST(date_trunc('month',entry_date) AS DATE) AS period,
+                 SUM(signed_amount_debit_positive) AS ledger_payroll_cost FROM warehouse.fact_ledger
+          WHERE TRY_CAST(account_code AS INTEGER) BETWEEN 5001 AND 5005 GROUP BY 1)
+      SELECT COALESCE(p.period,l.period) AS period,p.payroll_cost,l.ledger_payroll_cost,
+        COALESCE(p.payroll_cost,0)-COALESCE(l.ledger_payroll_cost,0) AS difference,
+        CASE WHEN ABS(COALESCE(p.payroll_cost,0)-COALESCE(l.ledger_payroll_cost,0))<=0.01 THEN 'PASS' ELSE 'FAIL' END AS status
+      FROM p FULL OUTER JOIN l USING(period)""")
+
     joins = [
       ("fact_payroll","employee_key","dim_employee","employee_key"),("fact_payroll","date_key","dim_date","date_key"),("fact_payroll","department_id","dim_department","department_id"),("fact_payroll","role_id","dim_role","role_id"),
       ("fact_attendance_monthly","employee_key","dim_employee","employee_key"),("fact_attendance_monthly","date_key","dim_date","date_key"),("fact_attendance_monthly","department_id","dim_department","department_id"),
@@ -258,55 +395,148 @@ def run():
       ("fact_invoice","client_id","dim_client","client_id"),("fact_invoice","service_line_account","dim_account","account_code"),("fact_invoice","invoice_date_key","dim_date","date_key"),
       ("fact_invoice_payment","invoice_id","fact_invoice","invoice_id"),("fact_invoice_payment","payment_date_key","dim_date","date_key"),
       ("fact_expense","vendor_id","dim_vendor","vendor_id"),("fact_expense","category_account","dim_account","account_code"),("fact_expense","department_id","dim_department","department_id"),("fact_expense","expense_date_key","dim_date","date_key"),
-      ("fact_task","team_id","dim_team","team_id"),("fact_task","sprint_id","dim_sprint","sprint_id"),("fact_task","assignee_employee_id","dim_employee","employee_id"),
-      ("fact_anomaly","employee_id","dim_employee","employee_id"),("fact_anomaly","period_key","dim_date","date_key"),
+      ("fact_task","team_id","dim_team","team_id"),("fact_task","sprint_id","dim_sprint","sprint_id"),("fact_task","employee_key","dim_employee","employee_key"),
+      ("fact_anomaly","employee_key","dim_employee","employee_key"),("fact_anomaly","period_key","dim_date","date_key"),
       ("fact_attrition_risk","employee_key","dim_employee","employee_key"),("fact_attrition_risk","department_id","dim_department","department_id"),("fact_attrition_risk","as_of_date_key","dim_date","date_key"),
       ("fact_forecast","department_id","dim_department","department_id"),("fact_forecast","forecast_month_key","dim_date","date_key"),
     ]
-    orphan_rows=[]
-    for fact, fk, dim, dk in joins:
-        special_scope = f" AND f.{qid(fk)} <> 'ALL'" if fact == "fact_forecast" and fk == "department_id" else ""
-        query=f"SELECT COUNT(*) FROM clean.{qid(fact)} f LEFT JOIN clean.{qid(dim)} d ON f.{qid(fk)}=d.{qid(dk)} WHERE f.{qid(fk)} IS NOT NULL AND d.{qid(dk)} IS NULL{special_scope}"
-        count=int(con.execute(query).fetchone()[0])
-        orphan_rows.append((fact,f"{fk} -> {dim}.{dk}",count))
-    con.execute("CREATE OR REPLACE TABLE audit.orphan_results(fact_table VARCHAR, relationship VARCHAR, orphan_rows BIGINT)")
-    con.executemany("INSERT INTO audit.orphan_results VALUES (?,?,?)",orphan_rows)
-    # 14 quality checks, implemented against actual bundle fields.
-    checks = [
-      ("DQ-C01","Payroll equals ledger","Critical","WITH p AS (SELECT CAST(date_trunc('month',period_end_date) AS DATE) m,SUM(employer_cost) v FROM clean.fact_payroll GROUP BY 1), l AS (SELECT CAST(date_trunc('month',entry_date) AS DATE) m,-SUM(signed_amount_debit_positive) v FROM clean.fact_ledger WHERE account_code BETWEEN '5001' AND '5005' GROUP BY 1) SELECT COUNT(*) FROM p FULL OUTER JOIN l USING(m) WHERE ABS(COALESCE(p.v,0)-COALESCE(l.v,0))>0.01"),
-      ("DQ-C02","Ledger balanced","Critical","SELECT COUNT(*) FROM (SELECT entry_id FROM clean.fact_ledger GROUP BY entry_id HAVING ABS(SUM(debit)-SUM(credit))>0.005)"),
-      ("DQ-C03","Unique payroll rows","Critical","SELECT COUNT(*) FROM (SELECT employee_id,date_key FROM clean.fact_payroll GROUP BY 1,2 HAVING COUNT(*)>1)"),
-      ("DQ-C04","No orphan employees","Critical","SELECT COUNT(*) FROM clean.fact_payroll p LEFT JOIN clean.dim_employee d USING(employee_id) WHERE d.employee_id IS NULL"),
-      ("DQ-C05","No attendance after exit","Warning","SELECT COUNT(*) FROM clean.fact_attendance_monthly a JOIN clean.dim_employee d ON a.employee_key=d.employee_key WHERE d.exit_date IS NOT NULL AND a.period_end_date>CAST(d.exit_date AS DATE)"),
-      ("DQ-C06","Unpaid leave deducted","Warning","SELECT COUNT(*) FROM (SELECT a.employee_id,a.period_end_date FROM clean.fact_attendance_monthly a LEFT JOIN clean.fact_payroll p USING(employee_id,period_end_date) WHERE a.unpaid_absence_days>0 AND COALESCE(p.lop_days,0)=0)"),
-      ("DQ-C07","Invoice arithmetic","Warning","SELECT COUNT(*) FROM clean.fact_invoice WHERE amount_paid>total_amount OR balance_due<0"),
-      ("DQ-C08","Expense arithmetic","Warning","SELECT COUNT(*) FROM clean.fact_expense WHERE ABS(total_amount-(amount_excl_gst+gst_amount))>0.01"),
-      ("DQ-C09","Task dates sensible","Warning","SELECT COUNT(*) FROM clean.fact_task WHERE completed_date<started_date OR (status='Done' AND completed_date IS NULL)"),
-      ("DQ-C10","Leave dates sensible","Warning","SELECT COUNT(*) FROM clean.fact_leave WHERE end_date<start_date"),
-      ("DQ-C11","AI feeds are fresh","Warning","SELECT COUNT(*) FROM clean.fact_attrition_risk WHERE as_of_date < (SELECT MAX(as_of_date) FROM clean.fact_attrition_risk)-INTERVAL 7 DAY"),
-      ("DQ-C12","Dimension history does not overlap","Critical","SELECT COUNT(*) FROM clean.dim_employee a JOIN clean.dim_employee b ON a.employee_id=b.employee_id AND a.employee_key<b.employee_key AND a.valid_to>=b.valid_from"),
-      ("DQ-C13","Pipeline freshness","Critical","SELECT COUNT(*) FROM audit.etl_run_log WHERE finished_at < now()-INTERVAL 24 HOUR"),
-      ("DQ-C14","Minimum group size","Critical","SELECT COUNT(*) FROM (SELECT value FROM metrics.dashboard_department_mix WHERE value<5 UNION ALL SELECT value FROM metrics.dashboard_location_tier WHERE value<5 UNION ALL SELECT value FROM metrics.dashboard_work_mode WHERE value<5)"),
-    ]
-    con.execute("CREATE TABLE IF NOT EXISTS audit.etl_run_log(finished_at TIMESTAMPTZ)")
-    con.execute("INSERT INTO audit.etl_run_log VALUES (now())")
     out=[]
-    for cid,name,severity,query in checks:
-        bad=int(con.execute(query).fetchone()[0]); out.append((cid,name,severity,bad,"PASS" if bad==0 else ("FAIL" if severity=="Critical" else "WARN"),datetime.now(timezone.utc).isoformat()))
-    con.execute("CREATE OR REPLACE TABLE audit.dq_results(check_id VARCHAR, check_name VARCHAR, severity VARCHAR, bad_rows BIGINT, status VARCHAR, run_at TIMESTAMPTZ)")
-    con.executemany("INSERT INTO audit.dq_results VALUES (?,?,?,?,?,?)",out)
-    print("table                         rows_in  passed  quarantined")
-    for table,ins,passed,bad in results: print(f"{table:<30} {ins:>7} {passed:>7} {bad:>12}")
-    print("\nDQ summary")
-    for row in con.execute("SELECT check_id,check_name,bad_rows,status FROM audit.dq_results ORDER BY check_id").fetchall(): print(f"{row[0]} {row[1]}: {row[3]} ({row[2]} bad rows)")
-    print("\nWarehouse orphan audit")
-    for row in con.execute("SELECT fact_table, relationship, orphan_rows FROM audit.orphan_results WHERE orphan_rows>0 ORDER BY fact_table, relationship").fetchall(): print(f"{row[0]} {row[1]}: {row[2]} orphan rows")
-    if not con.execute("SELECT COUNT(*) FROM audit.orphan_results WHERE orphan_rows>0").fetchone()[0]: print("No orphan keys found.")
-    critical_failures = con.execute("SELECT COUNT(*) FROM audit.dq_results WHERE severity='Critical' AND status='FAIL'").fetchone()[0]
-    print(f"\nDatabase: {DB}")
-    con.close()
-    if critical_failures: raise SystemExit(f"Load completed with {critical_failures} critical DQ failure(s); review audit.dq_results before release.")
+    for fact,fk,dim,dk in joins:
+        special = f" AND f.{qid(fk)}<>'ALL'" if fact=='fact_forecast' and fk=='department_id' else ""
+        query=f"""SELECT COUNT(*) FROM warehouse.{qid(fact)} f LEFT JOIN warehouse.{qid(dim)} d
+          ON f.{qid(fk)}=d.{qid(dk)} WHERE f.{qid(fk)} IS NOT NULL AND d.{qid(dk)} IS NULL{special}"""
+        count=int(con.execute(query).fetchone()[0])
+        out.append((fact,f"{fk} -> {dim}.{dk}",count,"No unmatched keys" if count==0 else "unresolved; see row-level result"))
+    con.execute("""CREATE OR REPLACE TABLE audit.orphan_results(
+      fact_table VARCHAR,relationship VARCHAR,orphan_rows BIGINT,disposition VARCHAR)""")
+    con.executemany("INSERT INTO audit.orphan_results VALUES (?,?,?,?)",out)
+
+
+def run(data_dir: Path = DATA, db_path: Path = DB, fail_on_critical: bool = False) -> int:
+    if not data_dir.exists():
+        raise FileNotFoundError(f"Expected CSV bundle at {data_dir}")
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    run_id = str(uuid.uuid4())
+    started = datetime.now(timezone.utc)
+    con = duckdb.connect(str(db_path))
+    _create_audit_tables(con)
+    con.execute("INSERT INTO audit.etl_run_log(run_id,started_at,status) VALUES (?,?, 'RUNNING')", [run_id,started])
+    try:
+        contracts = load_contracts(data_dir)
+        source_files = sorted(data_dir.glob("*.csv"))
+        if not source_files:
+            raise FileNotFoundError(f"No CSV files found in {data_dir}")
+        source_columns: dict[str,list[str]] = {}
+        for path in source_files:
+            table = path.stem
+            con.execute(f"CREATE OR REPLACE TABLE raw.{qid(table)} AS SELECT * FROM read_csv_auto(?,header=true,all_varchar=false,sample_size=-1)", [str(path)])
+            source_columns[table] = [r[0] for r in con.execute(f"DESCRIBE raw.{qid(table)}").fetchall()]
+
+        dictionary = _read_dictionary(con)
+        _schema_contracts(con,dictionary,source_columns)
+        for row in con.execute("SELECT table_name,column_name,status,detail FROM audit.schema_contract_results WHERE status='FAIL'").fetchall():
+            raise RuntimeError(f"Schema contract failed for {row[0]}.{row[1]}: {row[3]}")
+
+        payroll_employee_ids={str(x[0]) for x in con.execute("SELECT employee_id FROM raw.dim_employee").fetchall()}
+        employee_exit_dates={int(k):v for k,v in con.execute("SELECT employee_key,exit_date FROM raw.dim_employee WHERE exit_date IS NOT NULL").fetchall()}
+        seen_payroll_runs=set()
+        con.execute("CREATE OR REPLACE TABLE audit.load_summary(run_id VARCHAR,table_name VARCHAR,rows_in BIGINT,rows_passed BIGINT,rows_quarantined BIGINT,run_at TIMESTAMPTZ)")
+        load_rows=[]
+        for path in source_files:
+            table=path.stem
+            cols=source_columns[table]
+            rows=con.execute(f"SELECT * FROM raw.{qid(table)}").fetchdf().to_dict("records")
+            specs=dictionary.get(table,{})
+            pk=PRIMARY_KEYS.get(table,[])
+            seen=set(); passed_ids=[]; rejected=[]
+            for row_no,row in enumerate(rows,1):
+                issues=_row_schema_issues(row,specs)
+                issues.extend(_contract_issues(table,row,cols,contracts))
+                if table=="fact_payroll":
+                    employee_id=str(row.get("employee_id")) if not is_blank(row.get("employee_id")) else ""
+                    if employee_id not in payroll_employee_ids:
+                        issues.append(f"employee_id {employee_id or '<blank>'} has no matching dim_employee row")
+                    run_key=(employee_id,str(row.get("run_id")))
+                    if run_key in seen_payroll_runs:
+                        issues.append(f"duplicate employee_id/run_id payroll row {run_key}")
+                    else:
+                        seen_payroll_runs.add(run_key)
+                if table=="fact_attendance_monthly":
+                    employee_key=row.get("employee_key")
+                    period_end=row.get("period_end_date")
+                    exit_date=employee_exit_dates.get(int(employee_key)) if not is_blank(employee_key) else None
+                    if exit_date is not None and not is_blank(period_end):
+                        period_start=date(period_end.year,period_end.month,1)
+                        exit_month=date(exit_date.year,exit_date.month,1)
+                        if period_start>exit_month:
+                            issues.append(f"attendance period {period_start} begins after employee exit month {exit_month}")
+                if pk:
+                    key=tuple(serializable(row.get(c)) for c in pk)
+                    if key in seen:
+                        issues.append(f"duplicate primary key {key}")
+                    else:
+                        seen.add(key)
+                if issues:
+                    rejected.append((row_no,row,"; ".join(dict.fromkeys(issues))))
+                else:
+                    passed_ids.append(row_no)
+            if rejected:
+                con.register("_accepted_rows",pd.DataFrame({"source_row":passed_ids}))
+                col_list=','.join(f"r.{qid(c)}" for c in cols)
+                con.execute(f"""CREATE OR REPLACE TABLE clean.{qid(table)} AS
+                  WITH numbered AS (SELECT *,ROW_NUMBER() OVER() AS _source_row FROM raw.{qid(table)})
+                  SELECT {col_list} FROM numbered r JOIN _accepted_rows p ON r._source_row=p.source_row""")
+                con.unregister("_accepted_rows")
+            else:
+                con.execute(f"CREATE OR REPLACE TABLE clean.{qid(table)} AS SELECT * FROM raw.{qid(table)}")
+            for row_no,row,reason in rejected:
+                safe={key:serializable(value) for key,value in row.items()}
+                con.execute("INSERT INTO audit.quarantine VALUES (?,?,?,?,?)",[run_id,table,row_no,json.dumps(safe,default=str),reason])
+            load_rows.append((run_id,table,len(rows),len(passed_ids),len(rejected),started))
+        if load_rows:
+            con.executemany("INSERT INTO audit.load_summary VALUES (?,?,?,?,?,?)",load_rows)
+
+        build_warehouse(con)
+        create_metric_views(con)
+        con.execute("UPDATE audit.etl_run_log SET finished_at=?,status='SUCCESS' WHERE run_id=?",[datetime.now(timezone.utc),run_id])
+        dq=run_quality_checks(con,run_id)
+        con.execute("CREATE OR REPLACE VIEW audit.release_gate AS SELECT CASE WHEN COUNT(*) FILTER(WHERE status='FAIL')=0 THEN 'PASS' ELSE 'REVIEW REQUIRED' END AS status, COUNT(*) FILTER(WHERE status='FAIL') AS critical_checks_failed FROM audit.dq_results WHERE run_id=(SELECT run_id FROM audit.dq_results ORDER BY run_at DESC LIMIT 1)")
+
+        print("table                              rows_in   passed   quarantined   reconcile")
+        for _,table,rows_in,passed,quarantined,_ in load_rows:
+            status='OK' if rows_in==passed+quarantined else 'ERROR'
+            print(f"{table:<34} {rows_in:>8} {passed:>8} {quarantined:>13}   {status}")
+        print("\nData-quality summary (known source issues are retained and listed)")
+        print("check_id  table_name                         status  affected groups/rows")
+        for item in dq:
+            print(f"{item['check_id']:<9} {item['table_name']:<35} {item['status']:<7} {item['bad_rows']}")
+        print("\nWarehouse relationship audit")
+        for fact,relationship,orphans,disposition in con.execute("SELECT * FROM audit.orphan_results ORDER BY fact_table,relationship").fetchall():
+            print(f"{fact}.{relationship}: {orphans} orphans ({disposition})")
+        print(f"\nRelease gate: {con.execute('SELECT status FROM audit.release_gate').fetchone()[0]}")
+        print(f"Database: {db_path}")
+        critical=int(con.execute("SELECT COUNT(*) FROM audit.dq_results WHERE run_id=? AND severity='Critical' AND status='FAIL'",[run_id]).fetchone()[0])
+        con.close()
+        if fail_on_critical and critical:
+            raise SystemExit(f"{critical} critical DQ check(s) failed; see audit.dq_check_details")
+        return 0
+    except Exception as error:
+        try:
+            con.execute("UPDATE audit.etl_run_log SET finished_at=?,status='FAILED',error=? WHERE run_id=?",[datetime.now(timezone.utc),str(error),run_id])
+            con.close()
+        except Exception:
+            pass
+        raise
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser=argparse.ArgumentParser(description="Refresh PulseIQ raw, clean, warehouse, metrics and quality layers")
+    parser.add_argument("--data-dir",type=Path,default=DATA)
+    parser.add_argument("--db",type=Path,default=DB)
+    parser.add_argument("--fail-on-critical",action="store_true",help="return a failing exit code when critical source-quality checks have findings")
+    args=parser.parse_args(argv)
+    return run(args.data_dir,args.db,args.fail_on_critical)
 
 
 if __name__ == "__main__":
-    run()
+    sys.exit(main())
