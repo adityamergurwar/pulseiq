@@ -3,7 +3,7 @@
 **Name:** Aditya Mergurwar
 **Track:** Data Analytics · Aura Workforce by Growmar  
 **Phase:** 1 · Foundation  
-**Repository:** [Private `pulseiq` repository](https://github.com/adityamergurwar/pulseiq); `main` published with Streamlit secrets support
+**Repository:** [Public `pulseiq` repository](https://github.com/adityamergurwar/pulseiq); `main` published with Streamlit secrets support
 **Git tag:** Annotated `phase-1` tag is published at release commit `965d9f6`.
 **Live dashboard:** [pulseiq-workforce.streamlit.app](https://pulseiq-workforce.streamlit.app) (deployed; latest owner screenshot showed the dashboard loaded, but production login is not yet confirmed)
 
@@ -53,4 +53,4 @@ The implementation shows how preserving source rows and quarantining invalid row
 
 ## Next phase and submission
 
-The local project implements all 20 playbook modules, with hosted work and owner actions tracked in the acceptance matrix. The private repository and phase tag are published, and the live dashboard is deployed. Production login is not yet confirmed because the latest screenshot still showed the demo persona selector. A monthly GitHub Actions refresh/report workflow is configured; its first hosted run and a changing source feed remain to be confirmed. The phone and other-viewer checks, `fobesitech` collaborator, recorded five-minute demo, owner-confirmed learning reflection and programme upload still need to be completed before final submission.
+The local project implements all 20 playbook modules, with hosted work and owner actions tracked in the acceptance matrix. The public repository and phase tag are published, and the live dashboard is deployed. Production login is not yet confirmed because the latest screenshot still showed the demo persona selector. A monthly GitHub Actions refresh/report workflow is configured; its first hosted run and a changing source feed remain to be confirmed. The phone and other-viewer checks, `fobesitech` collaborator, recorded five-minute demo, owner-confirmed learning reflection and programme upload still need to be completed before final submission.

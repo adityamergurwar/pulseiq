@@ -2,7 +2,7 @@
 
 ## Current state
 
-The private [adityamergurwar/pulseiq repository](https://github.com/adityamergurwar/pulseiq) has a published `main` branch and annotated `phase-1` tag; the tag marks commit `965d9f6` (2026-10-22). The Streamlit Community Cloud app is deployed at [pulseiq-workforce.streamlit.app](https://pulseiq-workforce.streamlit.app); the user supplied a browser screenshot showing the dashboard loaded there on 2026-10-22. The screenshot still showed the **Demo persona** control, so production authentication is not confirmed. The current code can read Streamlit-hosted secrets. The scheduled warehouse/report workflow is configured in `.github/workflows/monthly-refresh.yml`, but its first hosted run has not yet been observed. The included demo roles are simulations and must not be used as production authentication.
+The public [adityamergurwar/pulseiq repository](https://github.com/adityamergurwar/pulseiq) has a published `main` branch and annotated `phase-1` tag; the tag marks commit `965d9f6` (2026-10-22). The Streamlit Community Cloud app is deployed at [pulseiq-workforce.streamlit.app](https://pulseiq-workforce.streamlit.app); the user supplied a browser screenshot showing the dashboard loaded there on 2026-10-22. The screenshot still showed the **Demo persona** control, so production authentication is not confirmed. The current code can read Streamlit-hosted secrets. The scheduled warehouse/report workflow is configured in `.github/workflows/monthly-refresh.yml`, but its first hosted run has not yet been observed. The included demo roles are simulations and must not be used as production authentication.
 
 ## Remaining go-live and submission actions
 
