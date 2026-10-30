@@ -17,6 +17,21 @@ ROOT = Path(__file__).resolve().parents[1]
 DB_PATH = Path(os.environ.get("PULSEIQ_DB_PATH", ROOT / "pulseiq.duckdb"))
 DEMO_USERS = ROOT / "05_Starter" / "demo_users.csv"
 
+_SCORECARD_VIEWS = {
+    "metrics.m01_headcount",
+    "metrics.m04_attrition_monthly",
+    "metrics.m13_attendance_rate",
+    "metrics.m11_overtime_share",
+    "metrics.m09_payroll_cost",
+    "metrics.m16_revenue",
+    "metrics.m18_operating_margin",
+    "metrics.dashboard_task_completion_monthly",
+}
+_SCORECARD_GLOBAL_VIEWS = {
+    "metrics.m16_revenue",
+    "metrics.m18_operating_margin",
+}
+
 
 def config_value(name: str, default: Any = None) -> Any:
     """Read configuration from environment variables or Streamlit-hosted secrets."""
@@ -40,6 +55,23 @@ def query_df(sql: str, params: list[Any] | None = None) -> pd.DataFrame:
 def query_one(sql: str, params: list[Any] | None = None) -> Any:
     df = query_df(sql, params)
     return None if df.empty else df.iloc[0, 0]
+
+
+def company_metric_for_period(view: str, period: Any) -> pd.DataFrame:
+    """Query one approved scorecard view with the scope its schema supports."""
+    if view not in _SCORECARD_VIEWS:
+        raise ValueError(f"Unsupported company scorecard view: {view}")
+    scope = "" if view in _SCORECARD_GLOBAL_VIEWS else "department_id='ALL' AND "
+    return query_df(f"SELECT value FROM {view} WHERE {scope}period=?", [period])
+
+
+def quarantine_summary_for_run(run_id: str) -> pd.DataFrame:
+    """Summarize quarantine records using the audit table's source_table column."""
+    return query_df(
+        """SELECT source_table AS table_name,reason,COUNT(*) AS rows
+           FROM audit.quarantine WHERE run_id=? GROUP BY 1,2 ORDER BY 1,2""",
+        [run_id],
+    )
 
 
 def prior_month_headcount(department_id: str, selected_period: Any) -> pd.DataFrame:

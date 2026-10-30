@@ -1,7 +1,7 @@
 import pandas as pd
 import streamlit as st
 
-from pulseiq.app_common import DB_PATH, ensure_database, query_df, require_user
+from pulseiq.app_common import DB_PATH, ensure_database, quarantine_summary_for_run, query_df, require_user
 
 st.title("Data quality, contracts and lineage")
 st.caption("Refresh status, source quality issues, quarantine counts and warehouse reconciliation evidence.")
@@ -39,7 +39,7 @@ if not counts.empty:
     if int(counts.unexplained.abs().sum())==0:
         st.success("Every source table satisfies rows in = rows passed + rows quarantined.")
 
-quarantine=query_df("SELECT table_name,reason,COUNT(*) AS rows FROM audit.quarantine WHERE run_id=? GROUP BY 1,2 ORDER BY 1,2",[run_id])
+quarantine=quarantine_summary_for_run(run_id)
 if not quarantine.empty:
     st.subheader("Quarantined rows by reason")
     st.caption("Record-level identifiers are withheld here; the audit table retains the source row and reason for authorized investigation.")

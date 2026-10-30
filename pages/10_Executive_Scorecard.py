@@ -1,7 +1,7 @@
 import pandas as pd
 import streamlit as st
 
-from pulseiq.app_common import DB_PATH, ensure_database, insight, money, query_df, require_user
+from pulseiq.app_common import DB_PATH, company_metric_for_period, ensure_database, insight, money, query_df, require_user
 
 st.set_page_config(page_title="PulseIQ | Company scorecard", page_icon="◉", layout="wide")
 st.markdown("""<style>
@@ -34,16 +34,16 @@ metrics=[
 ]
 values=[]
 for mid,label,view,unit,grain in metrics:
-    df=query_df(f"SELECT value FROM {view} WHERE department_id='ALL' AND period=?",[period])
+    df=company_metric_for_period(view,period)
     prev_period=(pd.Timestamp(period)-pd.offsets.MonthBegin(1)).date()
-    prev=query_df(f"SELECT value FROM {view} WHERE department_id='ALL' AND period=?",[prev_period])
+    prev=company_metric_for_period(view,prev_period)
     value=None if df.empty else float(df.iloc[0,0])
     previous=None if prev.empty else float(prev.iloc[0,0])
     values.append({"id":mid,"name":label,"value":value,"previous":previous,"unit":unit})
 
-task=query_df("SELECT value FROM metrics.dashboard_task_completion_monthly WHERE department_id='ALL' AND period=?",[period])
+task=company_metric_for_period("metrics.dashboard_task_completion_monthly",period)
 prev_period=(pd.Timestamp(period)-pd.offsets.MonthBegin(1)).date()
-prev_task=query_df("SELECT value FROM metrics.dashboard_task_completion_monthly WHERE department_id='ALL' AND period=?",[prev_period])
+prev_task=company_metric_for_period("metrics.dashboard_task_completion_monthly",prev_period)
 values.append({"id":"M22","name":"Task completion","value":None if task.empty else float(task.iloc[0,0]),"previous":None if prev_task.empty else float(prev_task.iloc[0,0]),"unit":"percent"})
 
 target_rows=query_df("SELECT metric,AVG(target_value) AS target_value FROM metrics.dashboard_kpi_targets WHERE period=? GROUP BY 1",[period])
