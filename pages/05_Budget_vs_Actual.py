@@ -21,6 +21,9 @@ if user['role']=='EXECUTIVE':
 else:
     display=frame.copy()
 display=display.sort_values("variance",ascending=False)
+def status_color(value):
+    colors={"GREEN":"#DFF2E2;color:#14532D","AMBER":"#FFF1CC;color:#713F12","RED":"#FEE2E2;color:#7F1D1D","NO DATA":"#E5E7EB;color:#374151"}
+    return colors.get(str(value),"")
 top=display.iloc[0]
 k1,k2,k3=st.columns(3)
 k1.metric("Budget",money(display.budget_cost.sum()))
@@ -31,7 +34,8 @@ fig=px.bar(display.sort_values("variance"),x="variance",y="department_id",orient
 fig.update_layout(template="plotly_white",xaxis_title="Actual less budget (INR)",yaxis_title=None)
 st.plotly_chart(fig,use_container_width=True)
 insight(f"{top.department_id} ranks first for overspend in {month:%b %Y}, with {money(top.variance)} variance.")
-st.dataframe(display[["department_id","budget_cost","actual_cost","variance","variance_pct","status","recommendation"]].style.format({"budget_cost":"{:,.0f}","actual_cost":"{:,.0f}","variance":"{:,.0f}","variance_pct":"{:+.1f}%"}),use_container_width=True,hide_index=True)
+budget_table=display[["department_id","budget_cost","actual_cost","variance","variance_pct","status","recommendation"]].style.format({"budget_cost":"{:,.0f}","actual_cost":"{:,.0f}","variance":"{:,.0f}","variance_pct":"{:+.1f}%"}).applymap(status_color,subset=["status"])
+st.dataframe(budget_table,use_container_width=True,hide_index=True)
 over=display[display.variance>0].head(2)
 st.subheader("Recommended actions for the largest overspends")
 if over.empty:
@@ -39,8 +43,9 @@ if over.empty:
 else:
     for _,row in over.iterrows():
         st.markdown(f"- **{row.department_id} ({money(row.variance)}):** {row.recommendation}")
-st.caption("Status uses green when at or under budget, amber at up to 5% over, and red above 5%. These are operating thresholds, not source targets.")
+st.caption("Status uses green when at or under budget, amber up to 5% over, and red above 5%. These are operating thresholds, not source targets.")
 st.caption("Variance = actual payroll cost − budget. A positive amount is an overspend; a negative amount is underspend.")
+st.caption("Budget values are the approved baseline in the supplied snapshot. If a hiring freeze or other plan change makes that baseline stale, show the gap and review a revised scenario before interpreting the variance.")
 
 st.subheader("KPI status against approved monthly targets")
 targets=query_df("SELECT period,department_id,metric,target_value,actual_value,direction,status,variance,sample_size FROM metrics.dashboard_kpi_targets WHERE period=? ORDER BY metric,department_id",[month])
@@ -64,6 +69,7 @@ elif user['role']=='EXECUTIVE':
 if targets.empty:
     st.info("No approved KPI target rows are available for the selected month and scope.")
 else:
-    st.dataframe(targets.drop(columns=['period']).style.format({'target_value':'{:,.2f}','actual_value':'{:,.2f}','variance':'{:+,.2f}'}),use_container_width=True,hide_index=True)
+    target_table=targets.drop(columns=['period']).style.format({'target_value':'{:,.2f}','actual_value':'{:,.2f}','variance':'{:+,.2f}'}).applymap(status_color,subset=['status'])
+    st.dataframe(target_table,use_container_width=True,hide_index=True)
     green=int((targets.status=='GREEN').sum()); red=int((targets.status=='RED').sum())
     insight(f"{green} KPI target groups are on target and {red} are off target; sample thresholds are applied to task groups.")

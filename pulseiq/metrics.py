@@ -317,12 +317,48 @@ def create_metric_views(con) -> None:
             COUNT(DISTINCT leave_request_id),COUNT(DISTINCT employee_id)
           FROM requests GROUP BY 1,3 HAVING COUNT(DISTINCT employee_id)>=5""")
 
+    con.execute(f"""CREATE OR REPLACE VIEW metrics.dashboard_leave_type_monthly AS
+        WITH by_department AS (
+          SELECT CAST(date_trunc('month',l.start_date) AS DATE) AS period,
+            COALESCE(e.department_id,'UNKNOWN') AS department_id,
+            COALESCE(t.leave_type_name,l.leave_type_code) AS leave_type,
+            SUM(l.days) AS leave_days,COUNT(DISTINCT l.employee_id) AS people
+          FROM clean.fact_leave l
+          LEFT JOIN warehouse.dim_employee e ON e.employee_key=l.employee_key
+          LEFT JOIN clean.dim_leave_type t USING(leave_type_code)
+          WHERE l.status='Approved' GROUP BY 1,2,3
+        ), company AS (
+          SELECT CAST(date_trunc('month',l.start_date) AS DATE) AS period,'ALL' AS department_id,
+            COALESCE(t.leave_type_name,l.leave_type_code) AS leave_type,
+            SUM(l.days) AS leave_days,COUNT(DISTINCT l.employee_id) AS people
+          FROM clean.fact_leave l
+          LEFT JOIN clean.dim_leave_type t USING(leave_type_code)
+          WHERE l.status='Approved' GROUP BY 1,3
+        )
+        SELECT period,department_id,leave_type,leave_days,people FROM by_department
+          WHERE department_id<>'D00' AND people>={t('M15')}
+        UNION ALL
+        SELECT period,department_id,leave_type,leave_days,people FROM company WHERE people>={t('M15')}""")
+
+    con.execute("""CREATE OR REPLACE VIEW metrics.dashboard_calendar_monthly AS
+        SELECT CAST(date_trunc('month',date) AS DATE) AS period,
+          COUNT(*) FILTER(WHERE is_holiday='Y') AS public_holiday_count,
+          COUNT(*) FILTER(WHERE is_holiday='Y' AND day_of_week IN ('Friday','Monday')) AS long_weekend_holiday_count,
+          string_agg(CAST(date AS VARCHAR) || ' (' || day_of_week || ')', ', ' ORDER BY date)
+            FILTER(WHERE is_holiday='Y') AS holiday_dates
+        FROM clean.dim_date GROUP BY 1""")
+
     con.execute("""CREATE OR REPLACE VIEW metrics.dashboard_attrition AS
         SELECT h.month_start_date AS period,h.department_id,h.exits,h.voluntary_exits,
                a.value AS attrition_pct
         FROM clean.fact_headcount_monthly h LEFT JOIN metrics.m04_attrition_monthly a
           ON a.period=h.month_start_date AND a.department_id=h.department_id
         WHERE h.department_id<>'D00' AND h.headcount_start>=10""")
+    con.execute("""CREATE OR REPLACE VIEW metrics.dashboard_attrition_company AS
+        SELECT month_start_date AS period,'ALL' AS department_id,
+          SUM(exits) AS exits,SUM(voluntary_exits) AS voluntary_exits,
+          100.0*SUM(exits)/NULLIF(SUM(headcount_start),0) AS attrition_pct
+        FROM clean.fact_headcount_monthly GROUP BY 1""")
     con.execute("""CREATE OR REPLACE VIEW metrics.dashboard_exit_tenure AS
         WITH latest AS (
           SELECT *,ROW_NUMBER() OVER(PARTITION BY employee_id ORDER BY valid_from DESC,employee_key DESC) AS rn
@@ -336,16 +372,23 @@ def create_metric_views(con) -> None:
                  WHEN date_diff('month',e.hire_date,e.exit_date)<60 THEN '3-5 years'
                  ELSE '5+ years' END AS tenure_band
           FROM latest e WHERE e.rn=1 AND e.exit_date IS NOT NULL
-        ) SELECT department_id,tenure_band,COUNT(DISTINCT employee_id) AS exits
-          FROM exits GROUP BY 1,2 HAVING COUNT(DISTINCT employee_id)>=5""")
+        ), groups AS (
+          SELECT department_id,tenure_band,COUNT(DISTINCT employee_id) AS exits
+          FROM exits GROUP BY 1,2
+        ) SELECT department_id,tenure_band,exits FROM groups
+          WHERE department_id<>'D00' AND exits>=5
+        UNION ALL SELECT 'ALL',tenure_band,SUM(exits) FROM groups GROUP BY tenure_band HAVING SUM(exits)>=5""")
     con.execute("""CREATE OR REPLACE VIEW metrics.dashboard_exit_reasons AS
         WITH latest AS (
           SELECT *,ROW_NUMBER() OVER(PARTITION BY employee_id ORDER BY valid_from DESC,employee_key DESC) AS rn
           FROM clean.dim_employee
-        ) SELECT department_id,COALESCE(NULLIF(change_reason,''),'Reason not recorded') AS reason,
-          COUNT(DISTINCT employee_id) AS exits
-        FROM latest WHERE rn=1 AND exit_date IS NOT NULL
-        GROUP BY 1,2 HAVING COUNT(DISTINCT employee_id)>=5""")
+        ), groups AS (
+          SELECT department_id,COALESCE(NULLIF(change_reason,''),'Reason not recorded') AS reason,
+            COUNT(DISTINCT employee_id) AS exits
+          FROM latest WHERE rn=1 AND exit_date IS NOT NULL GROUP BY 1,2
+        ) SELECT department_id,reason,exits FROM groups
+          WHERE department_id<>'D00' AND exits>=5
+        UNION ALL SELECT 'ALL',reason,SUM(exits) FROM groups GROUP BY reason HAVING SUM(exits)>=5""")
     con.execute("""CREATE OR REPLACE VIEW metrics.dashboard_predicted_risk AS
         WITH latest AS (SELECT MAX(as_of_date) AS as_of_date FROM clean.fact_attrition_risk)
         SELECT r.as_of_date,r.department_id,r.risk_band,COUNT(DISTINCT r.employee_id) AS people,

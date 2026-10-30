@@ -76,6 +76,7 @@ Both packs default to the latest observed workforce month when `--month` is omit
 ## Project evidence
 
 - [Task acceptance matrix](docs/task_acceptance_matrix.md)
+- [Phase 2 validation evidence](docs/phase2_validation.md)
 - [Phase 1 report](docs/phase1_report.md)
 - [Validation results](docs/validation_results.md)
 - [Deployment runbook](docs/deployment.md)
@@ -85,6 +86,7 @@ Both packs default to the latest observed workforce month when `--month` is omit
 ## Local deliverables
 
 - Phase 1 evidence report: `output/pdf/DataAnalytics_Aditya_Mergurwar_Phase1_Report.pdf`
+- Phase 2 evidence report: `output/pdf/DataAnalytics_Aditya_Mergurwar_Phase2_Report.pdf`
 - September management pack: `output/pdf/PulseIQ_Monthly_Pack_2026-09.pdf`
 - Nine-sheet Excel snapshot: `outputs/pulseiq-monthly/PulseIQ_Monthly_Pack_2026-09.xlsx`
 - Nine-slide board briefing: `output/pptx/PulseIQ_Board_Pack_September_2026.pptx`
@@ -92,4 +94,4 @@ Both packs default to the latest observed workforce month when `--month` is omit
 
 ## Release status
 
-The public [pulseiq repository](https://github.com/adityamergurwar/pulseiq) has a published `main` branch and annotated `phase-1` tag; the tag marks commit `965d9f6`. The Streamlit dashboard is deployed at [pulseiq-workforce.streamlit.app](https://pulseiq-workforce.streamlit.app). The user-confirmed screenshot still showed the local demo persona selector, so production login is not yet verified. The monthly workflow is configured in the repository; its first GitHub Actions run and an incoming source feed are not yet confirmed. Phone and stranger checks, collaborator access, the recorded live demo, owner-confirmed learning reflection and programme upload remain to be completed. See the [acceptance matrix](docs/task_acceptance_matrix.md) and [deployment runbook](docs/deployment.md) for exact status.
+The [pulseiq repository](https://github.com/adityamergurwar/pulseiq) contains the Phase 1 foundation and Phase 2 people-and-teams work, with the `phase-2` release tag. The Streamlit dashboard is deployed at [pulseiq-workforce.streamlit.app](https://pulseiq-workforce.streamlit.app). The monthly workflow is configured; its hosted run and new source feed are handled as separate operational follow-up. See the [acceptance matrix](docs/task_acceptance_matrix.md) and [deployment runbook](docs/deployment.md) for exact status.
