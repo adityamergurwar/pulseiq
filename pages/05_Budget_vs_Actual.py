@@ -34,7 +34,7 @@ fig=px.bar(display.sort_values("variance"),x="variance",y="department_id",orient
 fig.update_layout(template="plotly_white",xaxis_title="Actual less budget (INR)",yaxis_title=None)
 st.plotly_chart(fig,use_container_width=True)
 insight(f"{top.department_id} ranks first for overspend in {month:%b %Y}, with {money(top.variance)} variance.")
-budget_table=display[["department_id","budget_cost","actual_cost","variance","variance_pct","status","recommendation"]].style.format({"budget_cost":"{:,.0f}","actual_cost":"{:,.0f}","variance":"{:,.0f}","variance_pct":"{:+.1f}%"}).applymap(status_color,subset=["status"])
+budget_table=display[["department_id","budget_cost","actual_cost","variance","variance_pct","status","recommendation"]].style.format({"budget_cost":"{:,.0f}","actual_cost":"{:,.0f}","variance":"{:,.0f}","variance_pct":"{:+.1f}%"}).map(status_color,subset=["status"])
 st.dataframe(budget_table,use_container_width=True,hide_index=True)
 over=display[display.variance>0].head(2)
 st.subheader("Recommended actions for the largest overspends")
@@ -69,7 +69,7 @@ elif user['role']=='EXECUTIVE':
 if targets.empty:
     st.info("No approved KPI target rows are available for the selected month and scope.")
 else:
-    target_table=targets.drop(columns=['period']).style.format({'target_value':'{:,.2f}','actual_value':'{:,.2f}','variance':'{:+,.2f}'}).applymap(status_color,subset=['status'])
+    target_table=targets.drop(columns=['period']).style.format({'target_value':'{:,.2f}','actual_value':'{:,.2f}','variance':'{:+,.2f}'}).map(status_color,subset=['status'])
     st.dataframe(target_table,use_container_width=True,hide_index=True)
     green=int((targets.status=='GREEN').sum()); red=int((targets.status=='RED').sum())
     insight(f"{green} KPI target groups are on target and {red} are off target; sample thresholds are applied to task groups.")
