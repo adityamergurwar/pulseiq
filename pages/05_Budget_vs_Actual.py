@@ -1,5 +1,5 @@
 import pandas as pd
-import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 from pulseiq.app_common import DB_PATH, department_picker, ensure_database, insight, money, query_df, require_user
@@ -29,10 +29,64 @@ k1,k2,k3=st.columns(3)
 k1.metric("Budget",money(display.budget_cost.sum()))
 k2.metric("Actual",money(display.actual_cost.sum()))
 k3.metric("Variance",money(display.variance.sum()),f"{100*display.variance.sum()/display.budget_cost.sum():+.1f}%")
-fig=px.bar(display.sort_values("variance"),x="variance",y="department_id",orientation="h",
-  title=f"{top.department_id} has the largest overspend at {money(top.variance)}",color_discrete_sequence=["#D17B0F"])
-fig.update_layout(template="plotly_white",xaxis_title="Actual less budget (INR)",yaxis_title=None)
-st.plotly_chart(fig,use_container_width=True)
+plot_df=display.sort_values("variance").copy()
+variance=plot_df.variance.astype(float)
+departments=plot_df.department_id.astype(str).tolist()
+labels=[f"{value / 1000:+,.1f}k" if abs(value)>=1000 else f"{value:+,.0f}" for value in variance]
+custom_values=variance.abs().tolist()
+low=min(0.0,float(variance.min()))
+high=max(0.0,float(variance.max()))
+extent=max(abs(low),abs(high),1.0)*1.2
+fig=go.Figure()
+fig.add_trace(go.Bar(
+    name="Overspend",
+    x=variance.clip(lower=0).tolist(),
+    y=departments,
+    orientation="h",
+    marker_color="#E58A1F",
+    text=[label if value>0 else "" for label,value in zip(labels,variance)],
+    textposition="outside",
+    textfont={"size":10,"color":"#F3F4F6"},
+    customdata=custom_values,
+    cliponaxis=False,
+    hovertemplate="<b>%{y}</b><br>INR %{customdata:,.0f} over budget<extra></extra>",
+))
+fig.add_trace(go.Bar(
+    name="Under budget",
+    x=variance.clip(upper=0).tolist(),
+    y=departments,
+    orientation="h",
+    marker_color="#168F86",
+    text=[label if value<0 else "" for label,value in zip(labels,variance)],
+    textposition="outside",
+    textfont={"size":10,"color":"#F3F4F6"},
+    customdata=custom_values,
+    cliponaxis=False,
+    hovertemplate="<b>%{y}</b><br>INR %{customdata:,.0f} under budget<extra></extra>",
+))
+fig.update_layout(
+    template="plotly_dark",
+    title={"text":"Department variance (actual - budget)","x":0.01,"xanchor":"left","font":{"size":16}},
+    barmode="overlay",
+    height=470,
+    margin={"l":18,"r":78,"t":82,"b":58},
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="rgba(0,0,0,0)",
+    font={"family":"Arial, sans-serif","size":12,"color":"#E5E7EB"},
+    legend={"orientation":"h","x":1,"xanchor":"right","y":1.12,"yanchor":"bottom","font":{"size":10}},
+    hoverlabel={"bgcolor":"#111827","font":{"color":"#F9FAFB"}},
+    xaxis={
+        "title":"Variance (INR)","tickformat":"~s","showgrid":True,
+        "gridcolor":"rgba(148,163,184,0.20)","zeroline":True,
+        "zerolinecolor":"#9CA3AF","zerolinewidth":2,
+        "range":[-extent,extent],"tickfont":{"size":10},
+    },
+    yaxis={
+        "title":None,"categoryorder":"array","categoryarray":departments,
+        "showgrid":False,"tickfont":{"size":11},
+    },
+)
+st.plotly_chart(fig,use_container_width=True,theme=None)
 insight(f"{top.department_id} ranks first for overspend in {month:%b %Y}, with {money(top.variance)} variance.")
 budget_table=display[["department_id","budget_cost","actual_cost","variance","variance_pct","status","recommendation"]].style.format({"budget_cost":"{:,.0f}","actual_cost":"{:,.0f}","variance":"{:,.0f}","variance_pct":"{:+.1f}%"}).map(status_color,subset=["status"])
 st.dataframe(budget_table,use_container_width=True,hide_index=True)
