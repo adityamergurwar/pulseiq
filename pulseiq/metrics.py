@@ -482,20 +482,45 @@ def create_metric_views(con) -> None:
           100.0*SUM(done_tasks)/NULLIF(SUM(planned_tasks),0) FROM tasks GROUP BY 1""")
     con.execute("""CREATE OR REPLACE VIEW metrics.dashboard_pnl_monthly AS
         WITH ledger AS (
-          SELECT CAST(date_trunc('month',entry_date) AS DATE) AS period,
-            SUM(CASE WHEN TRY_CAST(account_code AS INTEGER) BETWEEN 4001 AND 4004 THEN -signed_amount_debit_positive ELSE 0 END) AS revenue,
-            SUM(CASE WHEN TRY_CAST(account_code AS INTEGER) BETWEEN 5000 AND 5999 THEN signed_amount_debit_positive ELSE 0 END) AS expenses,
-            SUM(CASE WHEN TRY_CAST(account_code AS INTEGER)=4900 THEN -signed_amount_debit_positive ELSE 0 END) AS other_income,
-            SUM(CASE WHEN TRY_CAST(account_code AS INTEGER) BETWEEN 4000 AND 5999 THEN -signed_amount_debit_positive ELSE 0 END) AS net_profit
-          FROM warehouse.fact_ledger GROUP BY 1
+          SELECT CAST(date_trunc('month',l.entry_date) AS DATE) AS period,
+            SUM(CASE WHEN a.account_type='INCOME'
+                      AND TRY_CAST(a.account_code AS INTEGER) BETWEEN 4001 AND 4004
+                     THEN -l.signed_amount_debit_positive ELSE 0 END) AS revenue,
+            SUM(CASE WHEN a.account_type='EXPENSE'
+                     THEN l.signed_amount_debit_positive ELSE 0 END) AS expenses,
+            SUM(CASE WHEN a.account_type='INCOME'
+                      AND TRY_CAST(a.account_code AS INTEGER)=4900
+                     THEN -l.signed_amount_debit_positive ELSE 0 END) AS other_income,
+            SUM(CASE WHEN a.account_type='INCOME'
+                     THEN -l.signed_amount_debit_positive
+                     WHEN a.account_type='EXPENSE'
+                     THEN -l.signed_amount_debit_positive ELSE 0 END) AS net_profit
+          FROM warehouse.fact_ledger l
+          JOIN clean.dim_account a ON TRY_CAST(l.account_code AS INTEGER)=a.account_code
+          WHERE a.statement='Profit & Loss' AND a.is_group='N' AND a.is_active='Y'
+          GROUP BY 1
         ) SELECT period,revenue,other_income,expenses,net_profit,
           revenue+other_income-expenses-net_profit AS reconciliation_difference,
           100.0*net_profit/NULLIF(revenue,0) AS operating_margin_pct
           FROM ledger""")
+    con.execute("""CREATE OR REPLACE VIEW metrics.dashboard_pnl_account_mix AS
+        SELECT CAST(date_trunc('month',l.entry_date) AS DATE) AS period,
+               a.account_code,a.account_name,a.account_type,
+               SUM(CASE WHEN a.account_type='INCOME'
+                        THEN -l.signed_amount_debit_positive
+                        ELSE l.signed_amount_debit_positive END) AS amount
+        FROM warehouse.fact_ledger l
+        JOIN clean.dim_account a ON TRY_CAST(l.account_code AS INTEGER)=a.account_code
+        WHERE a.statement='Profit & Loss' AND a.is_group='N' AND a.is_active='Y'
+          AND ((a.account_type='INCOME' AND TRY_CAST(a.account_code AS INTEGER) BETWEEN 4001 AND 4004)
+               OR a.account_type='EXPENSE')
+        GROUP BY 1,2,3,4""")
     con.execute("""CREATE OR REPLACE VIEW metrics.dashboard_expense_category AS
         SELECT CAST(date_trunc('month',e.expense_date) AS DATE) AS period,e.category_account,a.account_name,
                SUM(e.total_amount) AS spend FROM clean.fact_expense e JOIN clean.dim_account a
-          ON e.category_account=a.account_code GROUP BY 1,2,3""")
+          ON e.category_account=a.account_code
+          WHERE a.account_type='EXPENSE' AND a.is_group='N' AND a.is_active='Y'
+          GROUP BY 1,2,3""")
     con.execute("""CREATE OR REPLACE VIEW metrics.dashboard_vendor_spend AS
         SELECT CAST(date_trunc('month',e.expense_date) AS DATE) AS period,e.vendor_id,v.vendor_name,
                SUM(e.total_amount) AS spend FROM clean.fact_expense e JOIN clean.dim_vendor v USING(vendor_id)
@@ -510,38 +535,38 @@ def create_metric_views(con) -> None:
             AND d.month_end_date>=b.first_period+INTERVAL 1 MONTH-INTERVAL 1 DAY
             AND d.month_end_date<=b.last_period+INTERVAL 1 MONTH-INTERVAL 1 DAY
         ), outstanding AS (
-          SELECT r.period,r.as_of_date,i.invoice_id,i.client_id,i.invoice_date,i.due_date,
+          SELECT r.period,r.as_of_date,i.invoice_id,i.client_id,i.invoice_date,i.due_date,i.status,
             GREATEST(i.total_amount-COALESCE(SUM(p.amount) FILTER(WHERE p.payment_date<=r.as_of_date),0),0) AS balance
           FROM report_dates r JOIN clean.fact_invoice i ON i.invoice_date<=r.as_of_date
           LEFT JOIN clean.fact_invoice_payment p USING(invoice_id)
           WHERE i.status NOT IN ('DRAFT','CANCELLED')
-          GROUP BY 1,2,3,4,5,6,i.total_amount
+          GROUP BY 1,2,3,4,5,6,7,i.total_amount
         ) SELECT o.*,CASE WHEN o.due_date>=o.as_of_date THEN 'Not due'
-             WHEN date_diff('day',o.due_date,o.as_of_date)<=30 THEN '1-30 days'
+             WHEN date_diff('day',o.due_date,o.as_of_date)<=30 THEN '0-30 days'
              WHEN date_diff('day',o.due_date,o.as_of_date)<=60 THEN '31-60 days'
              WHEN date_diff('day',o.due_date,o.as_of_date)<=90 THEN '61-90 days' ELSE '90+ days' END AS ageing_bucket
         FROM outstanding o WHERE o.balance>0""")
     con.execute("""CREATE OR REPLACE VIEW metrics.dashboard_receivables AS
         SELECT * FROM metrics.dashboard_receivables_asof
-        WHERE as_of_date=(SELECT MAX(as_of_date) FROM metrics.dashboard_receivables_asof)""")
+        WHERE as_of_date=(SELECT MAX(as_of_date) FROM metrics.dashboard_receivables_asof)
+          AND status IN ('SENT','OVERDUE','PARTIALLY_PAID')""")
     con.execute("""CREATE OR REPLACE VIEW metrics.dashboard_receivables_by_client AS
         SELECT r.as_of_date,r.client_id,c.client_name,SUM(r.balance) AS balance,
                AVG(date_diff('day',r.invoice_date,r.as_of_date)) AS average_days_open,
                COUNT(*) AS open_invoices
         FROM metrics.dashboard_receivables r JOIN clean.dim_client c USING(client_id)
-        GROUP BY 1,2,3 HAVING COUNT(DISTINCT r.invoice_id)>=5""")
+        GROUP BY 1,2,3""")
     con.execute("""CREATE OR REPLACE VIEW metrics.dashboard_overdue_by_client AS
         SELECT r.as_of_date,r.client_id,c.client_name,SUM(r.balance) AS overdue_balance,
                COUNT(DISTINCT r.invoice_id) AS overdue_invoices,
                AVG(date_diff('day',r.due_date,r.as_of_date)) AS average_days_past_due
-        FROM metrics.dashboard_receivables_asof r JOIN clean.dim_client c USING(client_id)
+        FROM metrics.dashboard_receivables r JOIN clean.dim_client c USING(client_id)
         WHERE r.ageing_bucket<>'Not due' GROUP BY 1,2,3
-        HAVING COUNT(DISTINCT r.invoice_id)>=5""")
+        """)
     con.execute("""CREATE OR REPLACE VIEW metrics.dashboard_client_collection AS
         WITH paid AS (
           SELECT client_id,AVG(days_to_pay) AS average_days_to_pay,COUNT(DISTINCT invoice_id) AS paid_invoices
           FROM clean.fact_invoice WHERE status='PAID' AND days_to_pay IS NOT NULL GROUP BY 1
-          HAVING COUNT(DISTINCT invoice_id)>=5
         ) SELECT p.client_id,c.client_name,p.average_days_to_pay,p.paid_invoices,
           COALESCE(r.balance,0) AS open_receivables,r.average_days_open
         FROM paid p JOIN clean.dim_client c USING(client_id)

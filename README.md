@@ -23,6 +23,7 @@ Run the checks and the answer-key reconciliation:
 ```powershell
 python -m unittest discover -s tests -v
 python scripts/verify_acceptance.py
+python scripts/verify_phase3.py
 ```
 
 Run the metric API in another terminal:
@@ -48,6 +49,26 @@ The local demo persona selector is a role simulation, not authentication. For a 
 - `audit` records row counts, quarantine reasons, quality findings, relationship checks, corrections and ETL runs.
 
 The supplied `data_contracts.csv` defines additional value/range/format rules for four feeds. The source dictionary provides schema and nullability checks for 297 columns across 23 operational dimension/fact tables. Unexpected columns are retained and logged for schema review. See [contract notes](docs/contract_notes.md), [star schema](docs/star_schema.md), [metric lineage](docs/lineage.md), and [quality results](docs/validation_results.md).
+
+## P&L headline snapshot
+
+The supplied workbook's `README` sheet lists data-volume headlines but does not contain revenue, expense or profit totals. This project README records the clean-ledger headline for the 18 supplied months (April 2025 through September 2026) so the dashboard has an explicit comparison point. It is calculated from active detail accounts only; group headings are excluded.
+
+| P&L line | 18-month value |
+|---|---:|
+| Revenue (accounts 4001-4004) | INR 1,259,204,600.00 |
+| Other income (account 4900) | INR 1,725,452.00 |
+| Operating expenses (detail expense accounts) | INR 1,036,246,464.42 |
+| Net profit | INR 224,683,587.58 |
+| Operating margin (net profit / revenue) | 17.84% |
+
+Revenue plus other income less operating expenses equals net profit. The monthly P&L views are independently reconciled to the supplied PQ-09 ledger answer key; see [Phase 3 validation](docs/phase3_validation.md).
+
+## Phase 3: money and insight
+
+Phase 3 adds a detail-account-safe P&L and expense analysis, client receivables and cash movement, a department-month impact view, review-labelled anomaly and forecast charts, and an eight-metric executive scorecard. The department comparison aggregates each source before joining and records the exact differences caused by privacy suppression and quarantined task rows. Client payment-speed averages include every client with a paid invoice; low sample counts remain visible.
+
+`python scripts/verify_phase3.py` checks the task-specific totals against the supplied PQ-09 and PQ-13 keys, verifies ageing and client-day calculations, and records when forecast accuracy cannot be estimated. The data snapshot ends on 30 September 2026; a new source period is required to move the cutoff forward.
 
 ## Monthly management pack
 

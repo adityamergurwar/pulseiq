@@ -5,7 +5,7 @@ import streamlit as st
 from pulseiq.app_common import DB_PATH, department_picker, ensure_database, insight, money, query_df, require_user
 
 st.title("Department impact")
-st.caption("Payroll, attendance, approved leave, headcount, attrition and sprint work are aggregated separately before they are joined by department and month.")
+st.caption("One row per department and month. Payroll, attendance, approved leave, headcount, attrition and sprint work are each aggregated to that grain before they are joined.")
 if not ensure_database():
     st.warning("Run python etl.py first.")
     st.stop()
@@ -47,12 +47,37 @@ else:
     fig.update_layout(template="plotly_white",xaxis_title="Employer cost (INR)",yaxis_title=None)
     st.plotly_chart(fig,use_container_width=True)
     insight(f"{top.department_id} has the highest employer cost at {money(top.payroll_cost)} for {top.paid_people:,.0f} paid employees.")
-    fig=px.scatter(frame,x="cost_per_head",y="attrition_pct",size="paid_people",hover_name="department_id",color="department_id",title="Cost per paid employee and monthly attrition by department")
-    fig.update_layout(template="plotly_white",xaxis_title="Employer cost per paid employee (INR)",yaxis_title="Monthly attrition (%)",showlegend=False)
+    fig=px.scatter(
+        frame,
+        x="cost_per_head",
+        y="attrition_pct",
+        size="paid_people",
+        color="overtime_pay",
+        hover_name="department_id",
+        hover_data={
+            "payroll_cost": ":,.0f",
+            "overtime_pay": ":,.0f",
+            "overtime_hours": ":,.1f",
+            "leave_days_per_head": ":.2f",
+            "paid_people": True,
+            "cost_per_head": ":,.0f",
+            "attrition_pct": ":.2f",
+        },
+        color_continuous_scale="Teal",
+        title="People cost, overtime and attrition by department",
+    )
+    fig.update_layout(
+        template="plotly_white",
+        xaxis_title="Employer cost per paid employee (INR)",
+        yaxis_title="Monthly attrition (%)",
+        coloraxis_colorbar_title="Overtime cost<br>(INR)",
+        showlegend=False,
+    )
     st.plotly_chart(fig,use_container_width=True)
+    st.caption("Marker size represents paid headcount; color represents overtime payroll cost. The chart shows a cross-sectional relationship, not proof that overtime causes attrition. Workload, vacancies, seasonality and management changes can affect both.")
     highest=frame.loc[frame.attrition_pct.idxmax()]
     insight(f"{highest.department_id} has the highest monthly attrition at {highest.attrition_pct:.2f}%; the point size represents paid headcount.")
     show=["department_id","payroll_cost","gross_pay","overtime_pay","overtime_hours","late_arrivals","attendance_rate","approved_leave_days","leave_days_per_head","headcount_end","hires","exits","attrition_pct","planned_tasks","done_tasks","story_points_done","task_completion_pct","cost_per_head","overtime_share_pct"]
     st.dataframe(frame[show].sort_values("payroll_cost",ascending=False).style.format({c:"{:,.2f}" for c in show if c not in ["department_id"]}),hide_index=True,use_container_width=True)
 
-st.warning("Validation differences are intentional and documented: four post-exit attendance rows, four invalid payroll rows and 20 invalid task rows are quarantined. The answer key includes all 11 departments; D00 is suppressed here because it has one person. See docs/validation_results.md for row-level comparison counts without exposing the D00 values.")
+st.warning("Validation differences are explained: the reference contains 18 one-person D00 rows, which are suppressed for privacy. The clean layer quarantines 20 invalid task rows, causing expected task-total differences in 19 department-months; payroll, attendance, headcount and attrition fields match the privacy-safe reference. Four post-exit attendance and four invalid payroll rows are also quarantined. See docs/phase3_validation.md for counts without exposing D00 values.")

@@ -25,11 +25,13 @@ _SCORECARD_VIEWS = {
     "metrics.m09_payroll_cost",
     "metrics.m16_revenue",
     "metrics.m18_operating_margin",
+    "metrics.m20_dso",
     "metrics.dashboard_task_completion_monthly",
 }
 _SCORECARD_GLOBAL_VIEWS = {
     "metrics.m16_revenue",
     "metrics.m18_operating_margin",
+    "metrics.m20_dso",
 }
 
 

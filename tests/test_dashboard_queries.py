@@ -3,6 +3,7 @@ from datetime import date
 from unittest.mock import patch
 
 import streamlit as st
+import pandas as pd
 
 from pulseiq.app_common import (
     company_metric_for_period,
@@ -38,7 +39,7 @@ class DashboardQueryTests(unittest.TestCase):
             "metrics.m01_headcount",
             "metrics.m04_attrition_monthly",
             "metrics.m13_attendance_rate",
-            "metrics.m11_overtime_share",
+            "metrics.m20_dso",
             "metrics.m09_payroll_cost",
             "metrics.m16_revenue",
             "metrics.m18_operating_margin",
@@ -46,7 +47,10 @@ class DashboardQueryTests(unittest.TestCase):
         )
         for view in scorecard_views:
             with self.subTest(scorecard_view=view):
-                result = company_metric_for_period(view, selected_period)
+                selected = selected_period
+                if view == "metrics.m20_dso":
+                    selected = (pd.Timestamp(selected_period) + pd.offsets.MonthEnd(0)).date()
+                result = company_metric_for_period(view, selected)
                 self.assertEqual(list(result.columns), ["value"])
                 self.assertEqual(len(result), 1)
 
