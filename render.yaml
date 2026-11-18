@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: pulseiq-metrics-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile.api
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.10
+      - key: PULSEIQ_REQUIRE_LOGIN
+        value: "0"
+

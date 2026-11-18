@@ -1,6 +1,6 @@
 # Aura Workforce PulseIQ
 
-PulseIQ is a workforce and finance analytics product for the fictional Zenith Nova Technologies dataset. It contains a repeatable DuckDB pipeline, an auditable clean layer, a star-schema warehouse, 28 governed metrics, 12 Streamlit pages, a five-metric FastAPI service, validation evidence and monthly report builders.
+PulseIQ is a workforce and finance analytics product for the fictional Zenith Nova Technologies dataset. It contains a repeatable DuckDB pipeline, an auditable clean layer, a star-schema warehouse, governed metrics, 12 Streamlit pages, a five-metric FastAPI service, validation evidence and monthly report builders.
 
 All supplied people, companies and amounts are fictional training data. Source CSVs are retained as raw evidence. Invalid records are recorded with their source row and reason; derived outputs use the conformed or privacy-safe layer.
 
@@ -24,6 +24,7 @@ Run the checks and the answer-key reconciliation:
 python -m unittest discover -s tests -v
 python scripts/verify_acceptance.py
 python scripts/verify_phase3.py
+python scripts/verify_phase4.py
 ```
 
 Run the metric API in another terminal:
@@ -33,6 +34,8 @@ uvicorn pulseiq.api:app --host 127.0.0.1 --port 8000
 ```
 
 The OpenAPI UI is at `http://127.0.0.1:8000/docs`. The API exposes M01, M04, M09, M20 and M22 with definitions, lineage, data cutoff and privacy metadata.
+
+The dashboard is live at [pulseiq-workforce.streamlit.app](https://pulseiq-workforce.streamlit.app). The API is deployment-ready through `render.yaml` and `Dockerfile.api`; see [API deployment and examples](docs/api.md).
 
 ## Dashboards
 
@@ -70,6 +73,12 @@ Phase 3 adds a detail-account-safe P&L and expense analysis, client receivables 
 
 `python scripts/verify_phase3.py` checks the task-specific totals against the supplied PQ-09 and PQ-13 keys, verifies ageing and client-day calculations, and records when forecast accuracy cannot be estimated. The data snapshot ends on 30 September 2026; a new source period is required to move the cutoff forward.
 
+## Phase 4: release day
+
+Phase 4 hardens the application for repeatable release: exact dependency pins, a Python 3.11 scheduled workflow, one-command PDF and Excel packs, a role-aware KPI explorer, a documented five-metric API, privacy break tests, clean-machine evidence, release notes and final submission artifacts. `python scripts/verify_phase4.py` checks the release configuration and produces `docs/phase4_validation.md`.
+
+Four demo roles are available locally: `ADMIN`, `HR`, `MANAGER` and `EXECUTIVE`. Role scope and minimum-group suppression are applied before explorer results are displayed. The public training deployment contains aggregate fictional data; secrets belong only in the hosting platform's secret store. See [privacy and role break tests](docs/privacy_break_tests.md).
+
 ## Monthly management pack
 
 The PDF report builder uses the latest observed month by default or accepts a month such as `2026-09`:
@@ -102,12 +111,17 @@ Both packs default to the latest observed workforce month when `--month` is omit
 - [Validation results](docs/validation_results.md)
 - [Deployment runbook](docs/deployment.md)
 - [Board demo script](docs/board_demo_script.md)
-- [Release notes](docs/release_notes.md)
+- [Phase 4 validation](docs/phase4_validation.md)
+- [API guide](docs/api.md)
+- [Release notes](RELEASE_NOTES.md)
 
 ## Local deliverables
 
 - Phase 1 evidence report: `output/pdf/DataAnalytics_Aditya_Mergurwar_Phase1_Report.pdf`
 - Phase 2 evidence report: `output/pdf/DataAnalytics_Aditya_Mergurwar_Phase2_Report.pdf`
+- Phase 3 evidence report: `output/pdf/DataAnalytics_Aditya_Mergurwar_Phase3_Report.pdf`
+- Phase 4 evidence report: `output/pdf/DataAnalytics_Aditya_Mergurwar_Phase4_Report.pdf`
+- Consolidated final report: `output/pdf/DataAnalytics_Aditya_Mergurwar_Consolidated_Report.pdf`
 - September management pack: `output/pdf/PulseIQ_Monthly_Pack_2026-09.pdf`
 - Nine-sheet Excel snapshot: `outputs/pulseiq-monthly/PulseIQ_Monthly_Pack_2026-09.xlsx`
 - Nine-slide board briefing: `output/pptx/PulseIQ_Board_Pack_September_2026.pptx`
@@ -115,4 +129,4 @@ Both packs default to the latest observed workforce month when `--month` is omit
 
 ## Release status
 
-The [pulseiq repository](https://github.com/adityamergurwar/pulseiq) contains the Phase 1 foundation and Phase 2 people-and-teams work, with the `phase-2` release tag. The Streamlit dashboard is deployed at [pulseiq-workforce.streamlit.app](https://pulseiq-workforce.streamlit.app). The monthly workflow is configured; its hosted run and new source feed are handled as separate operational follow-up. See the [acceptance matrix](docs/task_acceptance_matrix.md) and [deployment runbook](docs/deployment.md) for exact status.
+The [public pulseiq repository](https://github.com/adityamergurwar/pulseiq) contains all four phases. The Streamlit dashboard is deployed at [pulseiq-workforce.streamlit.app](https://pulseiq-workforce.streamlit.app). The `v1.0.0`, `phase-4` and release-candidate tags identify the final and pre-release checkpoints. The fixed training snapshot ends on 2026-09-30; scheduled refreshes rebuild and validate the supplied data but require a new source feed to advance the cutoff. See the [acceptance matrix](docs/task_acceptance_matrix.md) and [deployment runbook](docs/deployment.md) for exact evidence.
