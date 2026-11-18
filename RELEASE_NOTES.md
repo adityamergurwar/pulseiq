@@ -14,7 +14,7 @@
 
 ### Validation
 
-- 28 automated tests pass in an isolated virtual environment.
+- 29 automated tests pass; 28 ran in the first isolated environment and the independent M29 reconciliation test passed after the challenge merge.
 - Phase 3 verifier passes 12/12 groups; Phase 4 verifier passes 11/11 groups.
 - Eighteen monthly payroll/ledger periods reconcile within INR 0.01; declared warehouse relationship orphans are zero.
 - A fictional D99 department fixture proves the budget view discovers a new department without code changes.

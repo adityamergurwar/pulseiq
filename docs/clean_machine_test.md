@@ -4,7 +4,7 @@
 
 The release candidate pins every direct Python dependency and targets Python 3.11 in Docker and GitHub Actions. On 18 November 2026, the test created an empty virtual environment, installed only `requirements.txt`, rebuilt the warehouse, ran the automated checks and built the September PDF and Excel packs.
 
-Result: 28 automated tests passed, the Phase 3 verifier passed 12/12 groups, and the Phase 4 verifier passed 11/11 groups. The isolated warehouse and report artifacts were written under `.artifact_build/` and did not reuse the project virtual environment.
+Result: 28 automated tests passed in the first isolated run, the Phase 3 verifier passed 12/12 groups, and the Phase 4 verifier passed 11/11 groups. After the independent challenge merge, the full project suite increased to 29 tests and passed again. The isolated warehouse and report artifacts were written under `.artifact_build/` and did not reuse the project virtual environment.
 
 ## Commands
 

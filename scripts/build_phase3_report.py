@@ -7,7 +7,7 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
-from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -174,6 +174,42 @@ def build_cards():
     return table
 
 
+def screenshot_gallery():
+    evidence_dir = ROOT / "output" / "evidence" / "phase3"
+    items = [
+        ("P&amp;L and expenses", "pnl_expenses.png"),
+        ("Receivables and cash", "receivables_cash.png"),
+        ("Department impact", "department_impact.png"),
+        ("Forecasts and anomalies", "forecasts_anomalies.png"),
+        ("Executive scorecard", "executive_scorecard.png"),
+    ]
+    cells = []
+    for title, filename in items:
+        image = Image(str(evidence_dir / filename), width=139, height=78.1875, kind="proportional")
+        card = Table(
+            [[image], [p(title, "CardBodySmall3")]],
+            colWidths=[151.37],
+        )
+        card.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F4F7FA")),
+            ("BOX", (0, 0), (-1, -1), 0.4, GRID),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("ALIGN", (0, 0), (0, 0), "CENTER"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        cells.append(card)
+    gallery = Table([cells], colWidths=[151.37] * 5, hAlign="LEFT")
+    gallery.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+    ]))
+    return gallery
+
+
 def stat_cards():
     items = [
         ("26 / 26", "unit tests passed"),
@@ -302,6 +338,9 @@ def build_report() -> Path:
             "The dashboard links open the Phase 3 page for each task; the source links open the matching implementation at the phase tag.",
             styles["BodySmall3"],
         ),
+        Spacer(1, 3),
+        section("Dashboard screenshots"),
+        screenshot_gallery(),
     ])
 
     story.append(PageBreak())
