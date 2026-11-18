@@ -66,5 +66,5 @@ st.subheader("SCD and metric-layer release notes")
 repairs=query_df("SELECT employee_id,employee_key,source_valid_to,repaired_valid_to,reason FROM audit.scd_repairs")
 if not repairs.empty:
     st.dataframe(repairs,use_container_width=True,hide_index=True)
-st.markdown("- `raw` preserves the delivered CSV values.\n- `clean` contains contract-passing rows; failures remain in `audit.quarantine`.\n- `warehouse` applies the documented effective-date and balanced ledger corrections.\n- `metrics` owns the M01–M28 definitions and dashboard-safe aggregates.")
+st.markdown("- `raw` preserves the delivered CSV values.\n- `clean` contains contract-passing rows; failures remain in `audit.quarantine`.\n- `warehouse` applies the documented effective-date and balanced ledger corrections.\n- `metrics` owns the M01–M29 definitions and dashboard-safe aggregates.")
 st.caption("See docs/lineage.md for raw-to-dashboard lineage and docs/data_quality.md for the planted issue comparison.")
