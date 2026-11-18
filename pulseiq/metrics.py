@@ -15,11 +15,12 @@ METRIC_VIEWS = {
     "M20": "m20_dso", "M21": "m21_overdue_receivables", "M22": "m22_task_completion",
     "M23": "m23_on_time_delivery", "M24": "m24_velocity", "M25": "m25_cycle_time",
     "M26": "m26_anomaly_flag_rate", "M27": "m27_high_risk_share", "M28": "m28_forecast_error",
+    "M29": "m29_overdue_receivables_share",
 }
 
 
 def create_metric_views(con) -> None:
-    """Create all 28 dictionary-backed views and privacy-safe dashboard views."""
+    """Create dictionary-backed and release-challenge metric views."""
     rows = con.execute(
         "SELECT metric_id, minimum_group_size FROM clean.metric_dictionary"
     ).fetchall()
@@ -225,6 +226,22 @@ def create_metric_views(con) -> None:
         FROM clean.fact_forecast f LEFT JOIN clean.fact_headcount_monthly h
           ON f.metric='headcount_end' AND f.department_id=h.department_id AND f.forecast_month=h.month_start_date
         WHERE f.metric='headcount_end'"""
+    sql["m29_overdue_receivables_share"] = """WITH bounds AS (
+        SELECT CAST(date_trunc('month',(SELECT MIN(entry_date) FROM clean.fact_ledger)) AS DATE) AS first_period,
+               CAST(date_trunc('month',(SELECT MAX(invoice_date) FROM clean.fact_invoice)) AS DATE) AS last_period
+        ), months AS (
+        SELECT d.month_end_date AS period FROM clean.dim_date d,bounds b
+        WHERE d.is_month_end='Y' AND d.month_end_date>=b.first_period+INTERVAL 1 MONTH-INTERVAL 1 DAY
+          AND d.month_end_date<=b.last_period+INTERVAL 1 MONTH-INTERVAL 1 DAY GROUP BY 1
+        ), balances AS (
+        SELECT m.period,i.invoice_id,i.due_date,
+          GREATEST(i.total_amount-COALESCE((SELECT SUM(p.amount) FROM clean.fact_invoice_payment p
+            WHERE p.invoice_id=i.invoice_id AND p.payment_date<=m.period),0),0) AS balance
+        FROM months m JOIN clean.fact_invoice i ON i.invoice_date<=m.period
+        WHERE i.status NOT IN ('DRAFT','CANCELLED')
+        ) SELECT period,
+          100.0*SUM(CASE WHEN due_date<period THEN balance ELSE 0 END)/NULLIF(SUM(balance),0) AS value
+        FROM balances GROUP BY 1"""
 
     for view_name, query in sql.items():
         con.execute(f"CREATE OR REPLACE VIEW metrics.{view_name} AS {query}")
@@ -245,7 +262,14 @@ def create_metric_views(con) -> None:
           ('M21','m21_overdue_receivables'),('M22','m22_task_completion'),('M23','m23_on_time_delivery'),
           ('M24','m24_velocity'),('M25','m25_cycle_time'),('M26','m26_anomaly_flag_rate'),
           ('M27','m27_high_risk_share'),('M28','m28_forecast_error')
-        ) AS v(metric_id,view_name) USING(metric_id)""")
+        ) AS v(metric_id,view_name) USING(metric_id)
+        UNION ALL
+        SELECT 'M29','Overdue receivables share',
+               'Share of open receivables already past the invoice due date at month end.',
+               '100 * overdue open balance / total open balance',
+               'fact_invoice + fact_invoice_payment','Company per month','Monthly','Finance','%',
+               'Lower','Balances use payments received by the selected month end.',0,
+               'm29_overdue_receivables_share'""")
 
     # A single snapshot rule keeps SCD versions deterministic when a source overlap is flagged.
     snapshot = """WITH month_ends AS (

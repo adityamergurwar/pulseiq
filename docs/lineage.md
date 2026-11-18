@@ -7,7 +7,7 @@ flowchart LR
   A[Supplied CSV exports] --> B[raw schema and source dictionary checks]
   B --> C[clean rows, quarantines and conformed corrections]
   C --> D[warehouse dimensions and facts]
-  D --> E[metrics M01-M28]
+  D --> E[metrics M01-M29]
   E --> F[Streamlit dashboard views]
   E --> G[FastAPI metric endpoint]
   B --> H[audit run log and DQ evidence]
@@ -32,3 +32,5 @@ The API includes each metric's dictionary definition, source, formula, owner, un
 ## Freshness and limits
 
 The latest successful local ETL run is shown in `metrics.dashboard_data_freshness`; the source data cutoff is 2026-09-30. The static training extract does not contain new monthly deliveries, so a scheduled refresh cannot advance the cutoff without a new source file. M28 has 66 forecast rows and no measured forecast-error values because actuals end in September 2026 and projections begin in October 2026.
+
+M29 is the independent release challenge. Invoice and payment rows are reduced to month-end open balances, overdue balances are those past `due_date`, and the company ratio flows through `metrics.m29_overdue_receivables_share` to the role-aware KPI explorer. No client or employee identifier is returned.
