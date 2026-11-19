@@ -9,16 +9,19 @@ from pulseiq.app_common import company_metric_for_period, ensure_database, query
 st.set_page_config(page_title="PulseIQ | Company scorecard", page_icon="◉", layout="wide")
 st.markdown(
     """<style>
-    .block-container { max-width: 1440px; padding-top: 1rem; padding-bottom: .6rem; }
-    .scorecard-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-top:14px; }
-    .scorecard-card { border:1px solid #d8dee8; border-radius:12px; padding:14px 16px; background:#fff; color:#172033; min-height:190px; }
-    .scorecard-card h3 { margin:8px 0 4px; font-size:17px; color:#172033; }
-    .scorecard-card .metric-id { color:#64748b; font-size:12px; font-weight:700; letter-spacing:.06em; }
-    .scorecard-card .value { font-size:25px; line-height:1.2; font-weight:700; color:#0f766e; margin:4px 0 10px; }
-    .scorecard-card p { margin:4px 0; font-size:13px; color:#334155; }
-    .scorecard-card .why { min-height:34px; color:#475569; }
-    .scorecard-card a { display:inline-block; margin-top:7px; font-size:13px; font-weight:700; color:#0f766e; }
-    .status { display:inline-block; border-radius:99px; padding:3px 9px; font-size:11px; font-weight:700; }
+    .scorecard-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; margin-top:16px; }
+    .scorecard-card { border:1px solid #dce5ed; border-radius:18px; padding:17px 18px; background:linear-gradient(145deg,#fff 0%,#f9fbfc 100%);
+      color:#10233f; min-height:215px; box-shadow:0 12px 32px rgba(16,35,63,.07); position:relative; overflow:hidden; transition:transform .18s ease,box-shadow .18s ease; }
+    .scorecard-card:before { content:""; position:absolute; left:0; top:0; right:0; height:4px; background:linear-gradient(90deg,#0f766e,#2dd4bf); }
+    .scorecard-card:hover { transform:translateY(-2px); box-shadow:0 16px 38px rgba(16,35,63,.1); }
+    .scorecard-card h3 { margin:10px 0 5px; font-size:18px; color:#10233f; letter-spacing:-.02em; }
+    .scorecard-card .metric-id { color:#63778b; font-size:11px; font-weight:800; letter-spacing:.09em; }
+    .scorecard-card .value { font-size:27px; line-height:1.2; font-weight:800; color:#0f766e; margin:6px 0 11px; letter-spacing:-.035em; }
+    .scorecard-card p { margin:4px 0; font-size:13px; color:#334a60; }
+    .scorecard-card .why { min-height:40px; color:#52667a; }
+    .scorecard-card a { display:inline-block; margin-top:9px; padding:6px 9px; border-radius:8px; background:#e7f5f2;
+      border:1px solid #c7e7e1; font-size:12px; font-weight:750; color:#0b625c; text-decoration:none; }
+    .status { display:inline-block; border-radius:99px; padding:4px 9px; font-size:10px; font-weight:800; letter-spacing:.035em; }
     .status.good { background:#dcfce7; color:#166534; }
     .status.bad { background:#fee2e2; color:#991b1b; }
     .status.neutral { background:#e2e8f0; color:#475569; }
@@ -169,7 +172,7 @@ for card in cards:
         f"<p><b>Target:</b> {html.escape(card['target'])}</p>"
         f"<p><b>Trend:</b> {html.escape(card['trend'])}</p>"
         f"<p class='why'>{html.escape(card['rationale'])}</p>"
-        f"<a href='{html.escape(card['path'], quote=True)}' target='_self'>Open {html.escape(card['detail'])} &#8599;</a>"
+        f"<a href='{html.escape(card['path'], quote=True)}' target='_self'>Open {html.escape(card['detail'])}</a>"
         "</section>"
     )
 st.markdown("<div class='scorecard-grid'>" + "".join(card_html) + "</div>", unsafe_allow_html=True)

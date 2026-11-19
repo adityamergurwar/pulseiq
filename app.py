@@ -8,7 +8,6 @@ import streamlit as st
 from pulseiq.app_common import DB_PATH, department_picker, ensure_database, insight, money, pct, prior_month_headcount, query_df, require_user
 
 st.set_page_config(page_title="PulseIQ | Workforce", page_icon="◉", layout="wide")
-st.markdown("<style>.block-container{padding-top:1.8rem;max-width:1440px} h1{letter-spacing:-.035em}</style>", unsafe_allow_html=True)
 st.title("PulseIQ | Workforce and headcount")
 st.caption("Zenith Nova Technologies · fictional workforce data · governed metrics")
 if not ensure_database():

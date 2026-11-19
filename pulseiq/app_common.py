@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import html
 import json
 import os
 import binascii
@@ -11,6 +12,8 @@ from typing import Any
 
 import duckdb
 import pandas as pd
+import plotly.graph_objects as go
+import plotly.io as pio
 import streamlit as st
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -33,6 +36,131 @@ _SCORECARD_GLOBAL_VIEWS = {
     "metrics.m18_operating_margin",
     "metrics.m20_dso",
 }
+
+
+def _install_plotly_theme() -> None:
+    """Apply one presentation system to every Plotly chart in the app."""
+    theme = go.layout.Template(
+        layout=go.Layout(
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#FFFFFF",
+            colorway=["#0F766E", "#2563EB", "#D97706", "#7C3AED", "#DC2626", "#0891B2"],
+            font={"family": "Inter, Segoe UI, Arial, sans-serif", "size": 13, "color": "#24364B"},
+            title={"font": {"family": "Inter, Segoe UI, Arial, sans-serif", "size": 19, "color": "#10233F"}, "x": 0.01, "xanchor": "left"},
+            margin={"l": 28, "r": 22, "t": 70, "b": 42},
+            hoverlabel={"bgcolor": "#10233F", "bordercolor": "#10233F", "font": {"color": "#FFFFFF", "size": 12}},
+            legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1, "font": {"size": 11}},
+            xaxis={"showgrid": False, "linecolor": "#D9E2EC", "tickcolor": "#D9E2EC", "zerolinecolor": "#CBD5E1", "title_font": {"size": 12, "color": "#52667A"}},
+            yaxis={"showgrid": True, "gridcolor": "#E8EEF4", "gridwidth": 1, "zerolinecolor": "#CBD5E1", "title_font": {"size": 12, "color": "#52667A"}},
+            bargap=0.28, hovermode="closest",
+        )
+    )
+    pio.templates["pulseiq"] = theme
+    pio.templates["plotly_white"] = theme
+    pio.templates["plotly_dark"] = theme
+    pio.templates.default = "pulseiq"
+
+
+def apply_design_system() -> None:
+    """Install the PulseIQ executive dashboard styling for the current page."""
+    _install_plotly_theme()
+    st.markdown(
+        """<style>
+        :root { --pulse-navy:#10233F; --pulse-navy-2:#182F4F; --pulse-teal:#0F766E;
+          --pulse-teal-soft:#E7F5F2; --pulse-amber:#D97706; --pulse-canvas:#F3F6FA;
+          --pulse-card:#FFFFFF; --pulse-border:#DCE5ED; --pulse-muted:#607286; }
+        html, body, [class*="css"] { font-family:Inter,"Segoe UI",Arial,sans-serif; }
+        .stApp { background:radial-gradient(circle at 82% -10%,rgba(15,118,110,.08),transparent 30rem),
+          linear-gradient(180deg,#F8FAFC 0%,var(--pulse-canvas) 100%); color:var(--pulse-navy); }
+        [data-testid="stAppViewContainer"] > .main { background:transparent; }
+        .block-container { max-width:1500px; padding:1.65rem 2.25rem 4rem; }
+        h1 { color:var(--pulse-navy)!important; font-size:clamp(2.15rem,3vw,3.15rem)!important;
+          line-height:1.04!important; letter-spacing:-.045em!important; font-weight:800!important; margin-bottom:.35rem!important; }
+        h2 { color:var(--pulse-navy)!important; font-size:1.55rem!important; letter-spacing:-.025em!important;
+          margin-top:2.2rem!important; padding-left:.8rem; border-left:4px solid var(--pulse-teal); }
+        h3 { color:var(--pulse-navy)!important; letter-spacing:-.015em; }
+        p, li { line-height:1.62; }
+        [data-testid="stCaptionContainer"] { color:var(--pulse-muted)!important; font-size:.9rem!important; }
+        [data-testid="stSidebar"] { background:linear-gradient(180deg,#0B1C33 0%,#102A47 58%,#123D50 100%);
+          border-right:1px solid rgba(255,255,255,.08); }
+        [data-testid="stSidebar"] > div:first-child { padding-top:.45rem; }
+        [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p,
+        [data-testid="stSidebar"] [data-testid="stCaptionContainer"],
+        [data-testid="stSidebar"] label, [data-testid="stSidebar"] h3 { color:#E8F0F7!important; }
+        [data-testid="stSidebar"] [data-testid="stWidgetLabel"] p { color:#D7E3EE!important; font-weight:650!important; }
+        [data-testid="stSidebar"] [data-baseweb="select"] > div,
+        [data-testid="stSidebar"] input { background:rgba(255,255,255,.095)!important; border:1px solid rgba(255,255,255,.15)!important;
+          color:#FFFFFF!important; border-radius:11px!important; min-height:44px; }
+        [data-testid="stSidebar"] [data-baseweb="select"] span { color:#FFFFFF!important; }
+        [data-testid="stSidebarNav"] { padding-top:.35rem; }
+        [data-testid="stSidebarNav"] a { border-radius:10px; margin:.12rem .55rem; padding:.58rem .72rem; color:#DBE7F1; }
+        [data-testid="stSidebarNav"] a:hover { background:rgba(255,255,255,.09); }
+        [data-testid="stSidebarNav"] a[aria-current="page"] { background:linear-gradient(90deg,rgba(20,184,166,.26),rgba(255,255,255,.08));
+          box-shadow:inset 3px 0 0 #2DD4BF; color:#FFFFFF; font-weight:700; }
+        .pulse-brand { margin:.1rem .55rem 1.15rem; padding:1rem 1rem .9rem; border:1px solid rgba(255,255,255,.12);
+          background:linear-gradient(135deg,rgba(255,255,255,.11),rgba(45,212,191,.08)); border-radius:15px; }
+        .pulse-brand-row { display:flex; align-items:center; gap:.72rem; }
+        .pulse-logo { width:36px; height:36px; display:grid; place-items:center; border-radius:11px;
+          background:linear-gradient(135deg,#2DD4BF,#0F766E); color:white; font-weight:900; font-size:1rem; box-shadow:0 8px 24px rgba(45,212,191,.24); }
+        .pulse-brand-name { color:white; font-weight:800; font-size:1.05rem; letter-spacing:-.02em; }
+        .pulse-brand-sub { color:#AFC4D5; font-size:.72rem; margin-top:.08rem; letter-spacing:.06em; text-transform:uppercase; }
+        .pulse-context { display:flex; flex-wrap:wrap; gap:.55rem; align-items:center; margin:.7rem 0 1.35rem;
+          padding:.72rem .88rem; background:rgba(255,255,255,.72); border:1px solid var(--pulse-border); border-radius:13px;
+          box-shadow:0 8px 26px rgba(16,35,63,.045); backdrop-filter:blur(8px); }
+        .pulse-context-label { color:var(--pulse-muted); font-size:.76rem; font-weight:700; letter-spacing:.055em; text-transform:uppercase; }
+        .pulse-chip { display:inline-flex; align-items:center; gap:.35rem; background:var(--pulse-teal-soft); color:#0B625C;
+          border:1px solid #C4E7E1; border-radius:999px; padding:.3rem .62rem; font-size:.76rem; font-weight:750; }
+        .pulse-chip.secondary { background:#EEF3F8; color:#455B70; border-color:#DCE5ED; }
+        [data-testid="stMetric"] { background:linear-gradient(145deg,#FFFFFF 0%,#FAFCFD 100%); border:1px solid var(--pulse-border);
+          border-radius:17px; padding:1rem 1.08rem; min-height:128px; box-shadow:0 10px 30px rgba(16,35,63,.065); position:relative; overflow:hidden; }
+        [data-testid="stMetric"]:before { content:""; position:absolute; left:0; top:0; right:0; height:4px;
+          background:linear-gradient(90deg,var(--pulse-teal),#22C3B6); }
+        [data-testid="stMetricLabel"] p { color:#5D7084!important; font-size:.8rem!important; font-weight:700!important; letter-spacing:.035em; text-transform:uppercase; }
+        [data-testid="stMetricValue"] { color:var(--pulse-navy)!important; font-weight:790!important; letter-spacing:-.035em; }
+        [data-testid="stMetricDelta"] { font-weight:650; }
+        [data-testid="stPlotlyChart"] { background:var(--pulse-card); border:1px solid var(--pulse-border); border-radius:18px;
+          padding:.55rem .65rem .2rem; box-shadow:0 12px 34px rgba(16,35,63,.06); overflow:hidden; }
+        [data-testid="stDataFrame"], [data-testid="stTable"] { background:white; border:1px solid var(--pulse-border);
+          border-radius:15px; overflow:hidden; box-shadow:0 10px 28px rgba(16,35,63,.05); }
+        [data-testid="stAlert"] { border-radius:14px; border-width:1px; box-shadow:0 8px 24px rgba(16,35,63,.045); }
+        div[data-testid="stForm"] { background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.12); border-radius:14px; padding:.75rem; }
+        div[data-baseweb="select"] > div, input, textarea { border-radius:11px!important; border-color:#CBD7E2!important; }
+        .stButton > button, [data-testid="stFormSubmitButton"] button { border-radius:11px; font-weight:750; min-height:42px;
+          background:var(--pulse-navy); color:white; border:1px solid var(--pulse-navy); }
+        .stButton > button:hover, [data-testid="stFormSubmitButton"] button:hover { background:var(--pulse-teal); border-color:var(--pulse-teal); color:white; }
+        .pulse-insight { margin:.65rem 0 1.1rem; padding:.85rem 1rem; border-radius:13px; background:linear-gradient(90deg,#E7F5F2,#F7FBFA);
+          border:1px solid #C7E7E1; color:#173F45; display:flex; gap:.72rem; align-items:flex-start; box-shadow:0 8px 22px rgba(15,118,110,.055); }
+        .pulse-insight-mark { flex:0 0 auto; width:27px; height:27px; display:grid; place-items:center; border-radius:8px;
+          background:var(--pulse-teal); color:white; font-size:.76rem; font-weight:900; }
+        .pulse-insight strong { color:#0C5F59; }
+        hr { border-color:var(--pulse-border)!important; }
+        @media (max-width:900px) { .block-container { padding:1.25rem 1rem 3rem; } h1 { font-size:2.05rem!important; }
+          [data-testid="stMetric"] { min-height:110px; } .pulse-context { align-items:flex-start; } }
+        @media print { [data-testid="stSidebar"], [data-testid="stToolbar"], header { display:none!important; }
+          .stApp { background:white!important; } [data-testid="stMetric"], [data-testid="stPlotlyChart"] { box-shadow:none!important; } }
+        </style>""",
+        unsafe_allow_html=True,
+    )
+
+
+def _render_sidebar_brand() -> None:
+    st.sidebar.markdown(
+        """<div class="pulse-brand"><div class="pulse-brand-row"><div class="pulse-logo">PI</div>
+        <div><div class="pulse-brand-name">PulseIQ</div><div class="pulse-brand-sub">Decision intelligence</div></div>
+        </div></div>""",
+        unsafe_allow_html=True,
+    )
+
+
+def _render_context(user: dict[str, Any]) -> None:
+    role = html.escape(str(user.get("role", "EXECUTIVE")).title())
+    scope = html.escape(str(user.get("team_id") or user.get("department_id") or "Company"))
+    st.markdown(
+        f"""<div class="pulse-context"><span class="pulse-context-label">Current view</span>
+        <span class="pulse-chip">{role} · {scope}</span>
+        <span class="pulse-chip secondary">Data cut-off · 30 Sep 2026</span>
+        <span class="pulse-chip secondary">Governed metrics</span></div>""",
+        unsafe_allow_html=True,
+    )
 
 
 def config_value(name: str, default: Any = None) -> Any:
@@ -145,11 +273,14 @@ def _production_user() -> dict[str, Any] | None:
 
 def require_user() -> dict[str, Any]:
     """Resolve a protected user or an explicitly labelled local demo persona."""
+    apply_design_system()
+    _render_sidebar_brand()
     st.sidebar.markdown("### Access")
     if str(config_value("PULSEIQ_REQUIRE_LOGIN", "0")).strip() == "1":
         user = _production_user()
         if not user:
             st.stop()
+        _render_context(user)
         return user
     if DEMO_USERS.exists():
         roster = pd.read_csv(DEMO_USERS)
@@ -169,6 +300,7 @@ def require_user() -> dict[str, Any]:
         scope = {"department_id": None, "team_id": None}
     user = {"username": chosen, "role": role, **scope, "is_authenticated": False}
     st.sidebar.caption("Local role simulation; production login is enabled with PULSEIQ_REQUIRE_LOGIN=1.")
+    _render_context(user)
     return user
 
 
@@ -224,7 +356,12 @@ def pct(value: Any, already_pct: bool = True, digits: int = 1) -> str:
 
 
 def insight(text: str) -> None:
-    st.markdown(f"**Insight:** {text}")
+    safe_text = html.escape(text)
+    st.markdown(
+        f"""<div class="pulse-insight"><span class="pulse-insight-mark">IQ</span>
+        <div><strong>Decision signal</strong><br>{safe_text}</div></div>""",
+        unsafe_allow_html=True,
+    )
 
 
 def scoped_dept_clause(user: dict[str, Any], requested: str | None = None, column: str = "department_id"):
