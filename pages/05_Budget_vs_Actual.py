@@ -22,7 +22,7 @@ else:
     display=frame.copy()
 display=display.sort_values("variance",ascending=False)
 def status_color(value):
-    colors={"GREEN":"#DFF2E2;color:#14532D","AMBER":"#FFF1CC;color:#713F12","RED":"#FEE2E2;color:#7F1D1D","NO DATA":"#E5E7EB;color:#374151"}
+    colors={"GREEN":"#12372F;color:#6EE7B7","AMBER":"#3A2A10;color:#FCD34D","RED":"#3B171C;color:#FDA4AF","NO DATA":"#1F2937;color:#CBD5E1"}
     return colors.get(str(value),"")
 top=display.iloc[0]
 k1,k2,k3=st.columns(3)
@@ -46,7 +46,7 @@ fig.add_trace(go.Bar(
     marker_color="#E58A1F",
     text=[label if value>0 else "" for label,value in zip(labels,variance)],
     textposition="outside",
-    textfont={"size":10,"color":"#24364B"},
+    textfont={"size":10,"color":"#E7EEF6"},
     customdata=custom_values,
     cliponaxis=False,
     hovertemplate="<b>%{y}</b><br>INR %{customdata:,.0f} over budget<extra></extra>",
@@ -59,7 +59,7 @@ fig.add_trace(go.Bar(
     marker_color="#168F86",
     text=[label if value<0 else "" for label,value in zip(labels,variance)],
     textposition="outside",
-    textfont={"size":10,"color":"#24364B"},
+    textfont={"size":10,"color":"#E7EEF6"},
     customdata=custom_values,
     cliponaxis=False,
     hovertemplate="<b>%{y}</b><br>INR %{customdata:,.0f} under budget<extra></extra>",
@@ -72,14 +72,14 @@ fig.update_layout(
     height=470,
     margin={"l":12,"r":24,"t":82,"b":58},
     paper_bgcolor="rgba(0,0,0,0)",
-    plot_bgcolor="#FFFFFF",
-    font={"family":"Inter, Segoe UI, Arial, sans-serif","size":12,"color":"#24364B"},
+    plot_bgcolor="#0A0F17",
+    font={"family":"Inter, Segoe UI, Arial, sans-serif","size":12,"color":"#D7E2EC"},
     legend={"orientation":"h","x":1,"xanchor":"right","y":1.12,"yanchor":"bottom","font":{"size":10}},
-    hoverlabel={"bgcolor":"#10233F","font":{"color":"#FFFFFF"}},
+    hoverlabel={"bgcolor":"#111A27","font":{"color":"#FFFFFF"}},
     xaxis={
         "title":"Variance (INR)","tickformat":"~s","showgrid":True,
-        "gridcolor":"#E8EEF4","zeroline":True,
-        "zerolinecolor":"#94A3B8","zerolinewidth":2,
+        "gridcolor":"#202B3A","zeroline":True,
+        "zerolinecolor":"#64748B","zerolinewidth":2,
         "range":[-extent,extent],"tickfont":{"size":10},
     },
     yaxis={

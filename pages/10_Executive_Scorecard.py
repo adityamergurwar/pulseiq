@@ -10,21 +10,21 @@ st.set_page_config(page_title="PulseIQ | Company scorecard", page_icon="◉", la
 st.markdown(
     """<style>
     .scorecard-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; margin-top:16px; }
-    .scorecard-card { border:1px solid #dce5ed; border-radius:18px; padding:17px 18px; background:linear-gradient(145deg,#fff 0%,#f9fbfc 100%);
-      color:#10233f; min-height:215px; box-shadow:0 12px 32px rgba(16,35,63,.07); position:relative; overflow:hidden; transition:transform .18s ease,box-shadow .18s ease; }
+    .scorecard-card { border:1px solid #263244; border-radius:18px; padding:17px 18px; background:linear-gradient(145deg,#121B28 0%,#0B111A 100%);
+      color:#E6EDF5; min-height:215px; box-shadow:0 16px 38px rgba(0,0,0,.3); position:relative; overflow:hidden; transition:transform .18s ease,box-shadow .18s ease; }
     .scorecard-card:before { content:""; position:absolute; left:0; top:0; right:0; height:4px; background:linear-gradient(90deg,#0f766e,#2dd4bf); }
-    .scorecard-card:hover { transform:translateY(-2px); box-shadow:0 16px 38px rgba(16,35,63,.1); }
-    .scorecard-card h3 { margin:10px 0 5px; font-size:18px; color:#10233f; letter-spacing:-.02em; }
-    .scorecard-card .metric-id { color:#63778b; font-size:11px; font-weight:800; letter-spacing:.09em; }
-    .scorecard-card .value { font-size:27px; line-height:1.2; font-weight:800; color:#0f766e; margin:6px 0 11px; letter-spacing:-.035em; }
-    .scorecard-card p { margin:4px 0; font-size:13px; color:#334a60; }
-    .scorecard-card .why { min-height:40px; color:#52667a; }
-    .scorecard-card a { display:inline-block; margin-top:9px; padding:6px 9px; border-radius:8px; background:#e7f5f2;
-      border:1px solid #c7e7e1; font-size:12px; font-weight:750; color:#0b625c; text-decoration:none; }
+    .scorecard-card:hover { transform:translateY(-2px); box-shadow:0 20px 46px rgba(0,0,0,.42); border-color:#3D5368; }
+    .scorecard-card h3 { margin:10px 0 5px; font-size:18px; color:#F7FAFC; letter-spacing:-.02em; }
+    .scorecard-card .metric-id { color:#93A4B7; font-size:11px; font-weight:800; letter-spacing:.09em; }
+    .scorecard-card .value { font-size:27px; line-height:1.2; font-weight:800; color:#5EEAD4; margin:6px 0 11px; letter-spacing:-.035em; }
+    .scorecard-card p { margin:4px 0; font-size:13px; color:#C3CFDB; }
+    .scorecard-card .why { min-height:40px; color:#99AABC; }
+    .scorecard-card a { display:inline-block; margin-top:9px; padding:6px 9px; border-radius:8px; background:#102C2B;
+      border:1px solid #22514E; font-size:12px; font-weight:750; color:#67E8D8; text-decoration:none; }
     .status { display:inline-block; border-radius:99px; padding:4px 9px; font-size:10px; font-weight:800; letter-spacing:.035em; }
-    .status.good { background:#dcfce7; color:#166534; }
-    .status.bad { background:#fee2e2; color:#991b1b; }
-    .status.neutral { background:#e2e8f0; color:#475569; }
+    .status.good { background:#12372F; color:#6EE7B7; }
+    .status.bad { background:#3B171C; color:#FDA4AF; }
+    .status.neutral { background:#202B3A; color:#C7D2DE; }
     @media (max-width:900px) { .scorecard-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
     @media print {
       @page { size:A4 landscape; margin:8mm; }

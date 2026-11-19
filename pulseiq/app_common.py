@@ -42,15 +42,15 @@ def _install_plotly_theme() -> None:
     """Apply one presentation system to every Plotly chart in the app."""
     theme = go.layout.Template(
         layout=go.Layout(
-            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#FFFFFF",
-            colorway=["#0F766E", "#2563EB", "#D97706", "#7C3AED", "#DC2626", "#0891B2"],
-            font={"family": "Inter, Segoe UI, Arial, sans-serif", "size": 13, "color": "#24364B"},
-            title={"font": {"family": "Inter, Segoe UI, Arial, sans-serif", "size": 19, "color": "#10233F"}, "x": 0.01, "xanchor": "left"},
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#0A0F17",
+            colorway=["#2DD4BF", "#60A5FA", "#F59E0B", "#A78BFA", "#FB7185", "#22D3EE"],
+            font={"family": "Inter, Segoe UI, Arial, sans-serif", "size": 13, "color": "#D7E2EC"},
+            title={"font": {"family": "Inter, Segoe UI, Arial, sans-serif", "size": 19, "color": "#F7FAFC"}, "x": 0.01, "xanchor": "left"},
             margin={"l": 28, "r": 22, "t": 70, "b": 42},
-            hoverlabel={"bgcolor": "#10233F", "bordercolor": "#10233F", "font": {"color": "#FFFFFF", "size": 12}},
+            hoverlabel={"bgcolor": "#111A27", "bordercolor": "#334155", "font": {"color": "#FFFFFF", "size": 12}},
             legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1, "font": {"size": 11}},
-            xaxis={"showgrid": False, "linecolor": "#D9E2EC", "tickcolor": "#D9E2EC", "zerolinecolor": "#CBD5E1", "title_font": {"size": 12, "color": "#52667A"}},
-            yaxis={"showgrid": True, "gridcolor": "#E8EEF4", "gridwidth": 1, "zerolinecolor": "#CBD5E1", "title_font": {"size": 12, "color": "#52667A"}},
+            xaxis={"showgrid": False, "linecolor": "#2A3748", "tickcolor": "#475569", "zerolinecolor": "#475569", "title_font": {"size": 12, "color": "#9FB0C2"}},
+            yaxis={"showgrid": True, "gridcolor": "#202B3A", "gridwidth": 1, "zerolinecolor": "#475569", "title_font": {"size": 12, "color": "#9FB0C2"}},
             bargap=0.28, hovermode="closest",
         )
     )
@@ -65,12 +65,13 @@ def apply_design_system() -> None:
     _install_plotly_theme()
     st.markdown(
         """<style>
-        :root { --pulse-navy:#10233F; --pulse-navy-2:#182F4F; --pulse-teal:#0F766E;
-          --pulse-teal-soft:#E7F5F2; --pulse-amber:#D97706; --pulse-canvas:#F3F6FA;
-          --pulse-card:#FFFFFF; --pulse-border:#DCE5ED; --pulse-muted:#607286; }
-        html, body, [class*="css"] { font-family:Inter,"Segoe UI",Arial,sans-serif; }
-        .stApp { background:radial-gradient(circle at 82% -10%,rgba(15,118,110,.08),transparent 30rem),
-          linear-gradient(180deg,#F8FAFC 0%,var(--pulse-canvas) 100%); color:var(--pulse-navy); }
+        :root { --pulse-navy:#F7FAFC; --pulse-navy-2:#D8E2EC; --pulse-teal:#2DD4BF;
+          --pulse-teal-soft:#102C2B; --pulse-amber:#F59E0B; --pulse-canvas:#06090F;
+          --pulse-card:#0D131D; --pulse-card-2:#111A27; --pulse-border:#263244; --pulse-muted:#98A8BA; }
+        html, body, [class*="css"] { font-family:Inter,"Segoe UI",Arial,sans-serif; color-scheme:dark; }
+        .stApp { background:radial-gradient(circle at 82% -12%,rgba(45,212,191,.105),transparent 32rem),
+          radial-gradient(circle at 15% 105%,rgba(37,99,235,.08),transparent 28rem),
+          linear-gradient(180deg,#080C13 0%,var(--pulse-canvas) 100%); color:#E6EDF5; }
         [data-testid="stAppViewContainer"] > .main { background:transparent; }
         .block-container { max-width:1500px; padding:1.65rem 2.25rem 4rem; }
         h1 { color:var(--pulse-navy)!important; font-size:clamp(2.15rem,3vw,3.15rem)!important;
@@ -80,7 +81,7 @@ def apply_design_system() -> None:
         h3 { color:var(--pulse-navy)!important; letter-spacing:-.015em; }
         p, li { line-height:1.62; }
         [data-testid="stCaptionContainer"] { color:var(--pulse-muted)!important; font-size:.9rem!important; }
-        [data-testid="stSidebar"] { background:linear-gradient(180deg,#0B1C33 0%,#102A47 58%,#123D50 100%);
+        [data-testid="stSidebar"] { background:linear-gradient(180deg,#04070B 0%,#080D15 55%,#0B171C 100%);
           border-right:1px solid rgba(255,255,255,.08); }
         [data-testid="stSidebar"] > div:first-child { padding-top:.45rem; }
         [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p,
@@ -104,34 +105,34 @@ def apply_design_system() -> None:
         .pulse-brand-name { color:white; font-weight:800; font-size:1.05rem; letter-spacing:-.02em; }
         .pulse-brand-sub { color:#AFC4D5; font-size:.72rem; margin-top:.08rem; letter-spacing:.06em; text-transform:uppercase; }
         .pulse-context { display:flex; flex-wrap:wrap; gap:.55rem; align-items:center; margin:.7rem 0 1.35rem;
-          padding:.72rem .88rem; background:rgba(255,255,255,.72); border:1px solid var(--pulse-border); border-radius:13px;
-          box-shadow:0 8px 26px rgba(16,35,63,.045); backdrop-filter:blur(8px); }
+          padding:.72rem .88rem; background:rgba(13,19,29,.88); border:1px solid var(--pulse-border); border-radius:13px;
+          box-shadow:0 12px 34px rgba(0,0,0,.28); backdrop-filter:blur(10px); }
         .pulse-context-label { color:var(--pulse-muted); font-size:.76rem; font-weight:700; letter-spacing:.055em; text-transform:uppercase; }
-        .pulse-chip { display:inline-flex; align-items:center; gap:.35rem; background:var(--pulse-teal-soft); color:#0B625C;
-          border:1px solid #C4E7E1; border-radius:999px; padding:.3rem .62rem; font-size:.76rem; font-weight:750; }
-        .pulse-chip.secondary { background:#EEF3F8; color:#455B70; border-color:#DCE5ED; }
-        [data-testid="stMetric"] { background:linear-gradient(145deg,#FFFFFF 0%,#FAFCFD 100%); border:1px solid var(--pulse-border);
-          border-radius:17px; padding:1rem 1.08rem; min-height:128px; box-shadow:0 10px 30px rgba(16,35,63,.065); position:relative; overflow:hidden; }
+        .pulse-chip { display:inline-flex; align-items:center; gap:.35rem; background:var(--pulse-teal-soft); color:#69E5D7;
+          border:1px solid #1F5753; border-radius:999px; padding:.3rem .62rem; font-size:.76rem; font-weight:750; }
+        .pulse-chip.secondary { background:#151E2A; color:#B5C2D0; border-color:#2A3748; }
+        [data-testid="stMetric"] { background:linear-gradient(145deg,#111925 0%,#0B111A 100%); border:1px solid var(--pulse-border);
+          border-radius:17px; padding:1rem 1.08rem; min-height:128px; box-shadow:0 14px 34px rgba(0,0,0,.3); position:relative; overflow:hidden; }
         [data-testid="stMetric"]:before { content:""; position:absolute; left:0; top:0; right:0; height:4px;
           background:linear-gradient(90deg,var(--pulse-teal),#22C3B6); }
-        [data-testid="stMetricLabel"] p { color:#5D7084!important; font-size:.8rem!important; font-weight:700!important; letter-spacing:.035em; text-transform:uppercase; }
+        [data-testid="stMetricLabel"] p { color:#98A8BA!important; font-size:.8rem!important; font-weight:700!important; letter-spacing:.035em; text-transform:uppercase; }
         [data-testid="stMetricValue"] { color:var(--pulse-navy)!important; font-weight:790!important; letter-spacing:-.035em; }
         [data-testid="stMetricDelta"] { font-weight:650; }
-        [data-testid="stPlotlyChart"] { background:var(--pulse-card); border:1px solid var(--pulse-border); border-radius:18px;
-          padding:.55rem .65rem .2rem; box-shadow:0 12px 34px rgba(16,35,63,.06); overflow:hidden; }
-        [data-testid="stDataFrame"], [data-testid="stTable"] { background:white; border:1px solid var(--pulse-border);
-          border-radius:15px; overflow:hidden; box-shadow:0 10px 28px rgba(16,35,63,.05); }
-        [data-testid="stAlert"] { border-radius:14px; border-width:1px; box-shadow:0 8px 24px rgba(16,35,63,.045); }
-        div[data-testid="stForm"] { background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.12); border-radius:14px; padding:.75rem; }
-        div[data-baseweb="select"] > div, input, textarea { border-radius:11px!important; border-color:#CBD7E2!important; }
+        [data-testid="stPlotlyChart"] { background:linear-gradient(145deg,#0E1520,#090E16); border:1px solid var(--pulse-border); border-radius:18px;
+          padding:.55rem .65rem .2rem; box-shadow:0 16px 38px rgba(0,0,0,.32); overflow:hidden; }
+        [data-testid="stDataFrame"], [data-testid="stTable"] { background:var(--pulse-card); border:1px solid var(--pulse-border);
+          border-radius:15px; overflow:hidden; box-shadow:0 14px 34px rgba(0,0,0,.27); }
+        [data-testid="stAlert"] { border-radius:14px; border-width:1px; box-shadow:0 10px 28px rgba(0,0,0,.22); }
+        div[data-testid="stForm"] { background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.1); border-radius:14px; padding:.75rem; }
+        div[data-baseweb="select"] > div, input, textarea { border-radius:11px!important; border-color:#344155!important; background:#0E1520!important; color:#F7FAFC!important; }
         .stButton > button, [data-testid="stFormSubmitButton"] button { border-radius:11px; font-weight:750; min-height:42px;
-          background:var(--pulse-navy); color:white; border:1px solid var(--pulse-navy); }
-        .stButton > button:hover, [data-testid="stFormSubmitButton"] button:hover { background:var(--pulse-teal); border-color:var(--pulse-teal); color:white; }
-        .pulse-insight { margin:.65rem 0 1.1rem; padding:.85rem 1rem; border-radius:13px; background:linear-gradient(90deg,#E7F5F2,#F7FBFA);
-          border:1px solid #C7E7E1; color:#173F45; display:flex; gap:.72rem; align-items:flex-start; box-shadow:0 8px 22px rgba(15,118,110,.055); }
+          background:#152235; color:white; border:1px solid #33445B; }
+        .stButton > button:hover, [data-testid="stFormSubmitButton"] button:hover { background:#145E58; border-color:#2DD4BF; color:white; }
+        .pulse-insight { margin:.65rem 0 1.1rem; padding:.85rem 1rem; border-radius:13px; background:linear-gradient(90deg,#0E2928,#101B23);
+          border:1px solid #22514E; color:#CDE8E5; display:flex; gap:.72rem; align-items:flex-start; box-shadow:0 12px 28px rgba(0,0,0,.24); }
         .pulse-insight-mark { flex:0 0 auto; width:27px; height:27px; display:grid; place-items:center; border-radius:8px;
           background:var(--pulse-teal); color:white; font-size:.76rem; font-weight:900; }
-        .pulse-insight strong { color:#0C5F59; }
+        .pulse-insight strong { color:#67E8D8; }
         hr { border-color:var(--pulse-border)!important; }
         @media (max-width:900px) { .block-container { padding:1.25rem 1rem 3rem; } h1 { font-size:2.05rem!important; }
           [data-testid="stMetric"] { min-height:110px; } .pulse-context { align-items:flex-start; } }
