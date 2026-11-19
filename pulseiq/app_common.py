@@ -73,7 +73,7 @@ def apply_design_system() -> None:
           radial-gradient(circle at 15% 105%,rgba(37,99,235,.08),transparent 28rem),
           linear-gradient(180deg,#080C13 0%,var(--pulse-canvas) 100%); color:#E6EDF5; }
         [data-testid="stAppViewContainer"] > .main { background:transparent; }
-        .block-container { max-width:1500px; padding:1.65rem 2.25rem 4rem; }
+        .block-container { max-width:1500px; padding:4.75rem 2.25rem 4rem; }
         h1 { color:var(--pulse-navy)!important; font-size:clamp(2.15rem,3vw,3.15rem)!important;
           line-height:1.04!important; letter-spacing:-.045em!important; font-weight:800!important; margin-bottom:.35rem!important; }
         h2 { color:var(--pulse-navy)!important; font-size:1.55rem!important; letter-spacing:-.025em!important;
@@ -134,7 +134,7 @@ def apply_design_system() -> None:
           background:var(--pulse-teal); color:white; font-size:.76rem; font-weight:900; }
         .pulse-insight strong { color:#67E8D8; }
         hr { border-color:var(--pulse-border)!important; }
-        @media (max-width:900px) { .block-container { padding:1.25rem 1rem 3rem; } h1 { font-size:2.05rem!important; }
+        @media (max-width:900px) { .block-container { padding:4.25rem 1rem 3rem; } h1 { font-size:2.05rem!important; }
           [data-testid="stMetric"] { min-height:110px; } .pulse-context { align-items:flex-start; } }
         @media print { [data-testid="stSidebar"], [data-testid="stToolbar"], header { display:none!important; }
           .stApp { background:white!important; } [data-testid="stMetric"], [data-testid="stPlotlyChart"] { box-shadow:none!important; } }

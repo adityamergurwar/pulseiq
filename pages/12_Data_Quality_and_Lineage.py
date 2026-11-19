@@ -58,7 +58,11 @@ if not recon.empty:
     st.metric("Reconciled periods",f"{int((recon.status=='PASS').sum())} / {len(recon)}")
 
 st.subheader("Declared feed contracts")
-contracts=query_df("SELECT table_name,column_name,data_type,is_nullable,allowed_values,minimum_value,maximum_value FROM clean.data_contracts ORDER BY table_name,column_name")
+contracts=query_df(
+    "SELECT feed AS table_name,column_name,data_type,nullable AS is_nullable,"
+    "rule_or_allowed_values AS allowed_values,description "
+    "FROM clean.data_contracts ORDER BY feed,column_name"
+)
 st.caption("The supplied contract file declares four contracted feeds. The loader also applies the dataset dictionary's type/nullability checks to all source feeds; uncovered business rules remain in the DQ catalog and report.")
 st.dataframe(contracts,use_container_width=True,hide_index=True)
 

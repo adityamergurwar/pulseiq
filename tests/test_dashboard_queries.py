@@ -64,6 +64,24 @@ class DashboardQueryTests(unittest.TestCase):
         )
         self.assertIn("fact_payroll", set(quarantine.table_name))
 
+        contracts = query_df(
+            "SELECT feed AS table_name,column_name,data_type,nullable AS is_nullable,"
+            "rule_or_allowed_values AS allowed_values,description "
+            "FROM clean.data_contracts ORDER BY feed,column_name"
+        )
+        self.assertGreater(len(contracts), 0)
+        self.assertEqual(
+            list(contracts.columns),
+            [
+                "table_name",
+                "column_name",
+                "data_type",
+                "is_nullable",
+                "allowed_values",
+                "description",
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
