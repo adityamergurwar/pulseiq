@@ -45,12 +45,16 @@ def _install_plotly_theme() -> None:
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#0A0F17",
             colorway=["#2DD4BF", "#60A5FA", "#F59E0B", "#A78BFA", "#FB7185", "#22D3EE"],
             font={"family": "Inter, Segoe UI, Arial, sans-serif", "size": 13, "color": "#D7E2EC"},
-            title={"font": {"family": "Inter, Segoe UI, Arial, sans-serif", "size": 19, "color": "#F7FAFC"}, "x": 0.01, "xanchor": "left"},
-            margin={"l": 28, "r": 22, "t": 70, "b": 42},
+            title={"font": {"family": "Inter, Segoe UI, Arial, sans-serif", "size": 17, "color": "#F7FAFC"}, "x": 0.01, "xanchor": "left"},
+            autosize=True, height=430,
+            margin={"l": 34, "r": 14, "t": 64, "b": 104},
             hoverlabel={"bgcolor": "#111A27", "bordercolor": "#334155", "font": {"color": "#FFFFFF", "size": 12}},
-            legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1, "font": {"size": 11}},
-            xaxis={"showgrid": False, "linecolor": "#2A3748", "tickcolor": "#475569", "zerolinecolor": "#475569", "title_font": {"size": 12, "color": "#9FB0C2"}},
-            yaxis={"showgrid": True, "gridcolor": "#202B3A", "gridwidth": 1, "zerolinecolor": "#475569", "title_font": {"size": 12, "color": "#9FB0C2"}},
+            legend={"orientation": "h", "yanchor": "top", "y": -0.2, "xanchor": "left", "x": 0,
+                    "font": {"size": 10}, "entrywidth": 108, "entrywidthmode": "pixels"},
+            xaxis={"showgrid": False, "linecolor": "#2A3748", "tickcolor": "#475569", "zerolinecolor": "#475569",
+                   "automargin": True, "title_font": {"size": 12, "color": "#9FB0C2"}},
+            yaxis={"showgrid": True, "gridcolor": "#202B3A", "gridwidth": 1, "zerolinecolor": "#475569",
+                   "automargin": True, "title_font": {"size": 12, "color": "#9FB0C2"}},
             bargap=0.28, hovermode="closest",
         )
     )
@@ -134,8 +138,31 @@ def apply_design_system() -> None:
           background:var(--pulse-teal); color:white; font-size:.76rem; font-weight:900; }
         .pulse-insight strong { color:#67E8D8; }
         hr { border-color:var(--pulse-border)!important; }
-        @media (max-width:900px) { .block-container { padding:4.25rem 1rem 3rem; } h1 { font-size:2.05rem!important; }
-          [data-testid="stMetric"] { min-height:110px; } .pulse-context { align-items:flex-start; } }
+        @media (max-width:700px) {
+          .block-container { padding:3.65rem .6rem 3rem; }
+          h1 { font-size:1.78rem!important; line-height:1.12!important; letter-spacing:-.035em!important; }
+          h2 { font-size:1.24rem!important; line-height:1.2!important; margin-top:1.55rem!important; padding-left:.55rem; }
+          h3 { font-size:1.05rem!important; }
+          [data-testid="stToolbar"] { display:none!important; }
+          [data-testid="stMetric"] { min-height:96px; padding:.72rem .78rem; border-radius:14px; }
+          [data-testid="stMetricValue"] { font-size:2rem!important; }
+          [data-testid="stMetricLabel"] p { font-size:.72rem!important; }
+          [data-testid="stPlotlyChart"] { border-radius:14px; padding:.18rem .12rem 0; }
+          [data-testid="stPlotlyChart"] .modebar-container,
+          [data-testid="stPlotlyChart"] .modebar { display:none!important; }
+          [data-testid="stDataFrame"], [data-testid="stTable"] { border-radius:12px; overflow-x:auto!important; }
+          .pulse-context { align-items:flex-start; gap:.36rem; margin:.45rem 0 .9rem; padding:.58rem .62rem; }
+          .pulse-context-label { width:100%; }
+          .pulse-chip { font-size:.69rem; padding:.25rem .48rem; }
+          .pulse-insight { padding:.7rem .72rem; margin:.5rem 0 .85rem; }
+          div[data-testid="stHorizontalBlock"] { gap:.65rem; }
+        }
+        @media (min-width:701px) and (max-width:900px) {
+          .block-container { padding:4.25rem 1rem 3rem; }
+          h1 { font-size:2.05rem!important; }
+          [data-testid="stMetric"] { min-height:110px; }
+          .pulse-context { align-items:flex-start; }
+        }
         @media print { [data-testid="stSidebar"], [data-testid="stToolbar"], header { display:none!important; }
           .stApp { background:white!important; } [data-testid="stMetric"], [data-testid="stPlotlyChart"] { box-shadow:none!important; } }
         </style>""",
