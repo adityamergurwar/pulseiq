@@ -7,7 +7,7 @@
 - Reproducible DuckDB warehouse with raw evidence, clean dispositions, conformed facts and governed metric views.
 - Twelve-page Streamlit application covering workforce, people, delivery, payroll, budget, P&L, receivables, department impact, AI signals, executive scorecard, KPI exploration and data quality.
 - One-command monthly PDF and Excel packs for any available reporting month.
-- Five-metric FastAPI service with definitions, source, freshness and privacy metadata, plus OpenAPI documentation and a Render deployment blueprint.
+- Five-metric FastAPI service with definitions, source, freshness and privacy metadata, deployed publicly on Render with OpenAPI documentation.
 - Role-aware KPI exploration for ADMIN, HR, MANAGER and EXECUTIVE, including department/team scope and minimum-group suppression.
 - Nine-slide board pack, Phase 4 report, consolidated report, validation evidence and a five-minute demonstration script.
 - Exact direct dependency pins and a Python 3.11 GitHub Actions schedule for rebuild, tests, validation and report artifacts.
@@ -25,7 +25,7 @@
 - Forecast accuracy is unavailable until actual data overlaps the supplied forecast horizon.
 - Raw quality findings remain visible because the training data intentionally contains defects; conformed metrics use documented corrections or quarantines.
 - Production password hashes must be configured in the hosting secret store. No credential is stored in the repository.
-- The API blueprint is deployment-ready; the actual public API URL depends on the selected hosting account.
+- The public metrics API is live at `https://pulseiq-metrics-api-fezs.onrender.com`; the free Render service can take longer on the first request after an idle period.
 - The screen-and-face demonstration and programme-form upload are owner actions; `docs/board_demo_script.md` supplies the recording flow.
 
 ## v1.0.0-rc1 · Release candidate

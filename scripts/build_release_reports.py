@@ -16,6 +16,7 @@ PHASE4 = OUT / "DataAnalytics_Aditya_Mergurwar_Phase4_Report.pdf"
 CONSOLIDATED = OUT / "DataAnalytics_Aditya_Mergurwar_Consolidated_Report.pdf"
 REPO = "https://github.com/adityamergurwar/pulseiq"
 APP = "https://pulseiq-workforce.streamlit.app"
+API = "https://pulseiq-metrics-api-fezs.onrender.com"
 TAG = f"{REPO}/tree/phase-4"
 
 INK = colors.HexColor("#152238")
@@ -121,14 +122,14 @@ def phase4_task_table():
     rows = [[p("Task", "HeadR"), p("Status", "HeadR"), p("Build and evidence", "HeadR")]]
     values = [
         ("16 · Reporting package", "DONE", "One-command PDF/Excel for any available month; exact pins; scheduled Python 3.11 workflow; clean-environment test; D99 dynamic-department fixture."),
-        ("17 · Production go-live", "LIVE", f"Public aggregate dashboard: {link('open app', APP)}. Streamlit selected for fast Python delivery; Render blueprint supplied for the API; secrets stay in host storage."),
+        ("17 · Production go-live", "PENDING PROOF", f"Public aggregate dashboard: {link('open app', APP)}. Cutoff and hosting choice are documented; physical-phone and independent-viewer proof still require owner evidence."),
         ("18 · KPI explorer", "DONE", "Catalog-driven metric selection, company/department/team drill-down, four demo roles, fixed scope, and minimum-group suppression with documented break tests."),
-        ("19 · API and lineage", "DONE", f"Five governed FastAPI metrics with value, definition, source, freshness and privacy. {link('API guide', REPO + '/blob/phase-4/docs/api.md')} and source-to-dashboard lineage included."),
-        ("20 · Board release", "DONE", "Nine-slide board pack, release notes, consolidated report, demo script and independent M29 challenge committed on its own branch before merge."),
+        ("19 · API and lineage", "DONE · LIVE", f"Five governed FastAPI metrics are public at {link('Render API', API)} with value, definition, source, freshness and privacy. {link('API guide', REPO + '/blob/main/docs/api.md')} and lineage are included."),
+        ("20 · Board release", "PENDING DEMO", "Nine-slide board pack, release notes, consolidated report, demo script and independent M29 challenge are complete. Personal face-and-screen recording and form upload remain owner actions."),
     ]
     for task, status, evidence in values:
         rows.append([p(task, "CellBoldR"), p(status, "CellBoldR"), p(evidence, "CellR")])
-    t = Table(rows, colWidths=[148, 55, 553], repeatRows=1)
+    t = Table(rows, colWidths=[145, 85, 526], repeatRows=1)
     t.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), INK), ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE, SOFT]),
         ("GRID", (0, 0), (-1, -1), .4, GRID), ("VALIGN", (0, 0), (-1, -1), "TOP"),
@@ -144,7 +145,7 @@ def build_phase4():
     doc = SimpleDocTemplate(str(PHASE4), pagesize=landscape(A4), leftMargin=15*mm, rightMargin=15*mm, topMargin=13*mm, bottomMargin=15*mm, title="PulseIQ Phase 4 Report", author="Aditya Mergurwar")
     story = [
         p("DATA ANALYTICS TRACK · PHASE 4", "EyebrowR"), p("PulseIQ Phase 4: Release Day", "TitleR"),
-        p(f"Aditya Mergurwar · {link('GitHub repository', REPO)} · {link('phase-4 tag', TAG)} · {link('live dashboard', APP)}", "SubR"),
+        p(f"Aditya Mergurwar · {link('GitHub repository', REPO)} · {link('phase-4 tag', TAG)} · {link('live dashboard', APP)} · {link('live metrics API', API)}", "SubR"),
         Spacer(1, 3), phase4_task_table(), Spacer(1, 6),
         p("Release proof", "SectionR"),
         stat_row([("29 / 29", "automated tests pass"), ("11 / 11", "Phase 4 checks pass"), ("29", "governed metrics"), ("0", "declared orphans"), ("18 / 18", "finance months reconcile")]),
@@ -157,7 +158,7 @@ def build_phase4():
         Spacer(1, 6),
         info_cards([
             ("Reporting", "September PDF and nine-sheet Excel pack rebuild from the warehouse with one command. Files carry the reporting month and data cutoff."),
-            ("Deployment", "Streamlit serves the public training dashboard. GitHub Actions runs tests and monthly artifacts; Docker and Render files make the API portable."),
+            ("Deployment", "Streamlit serves the public training dashboard. Render serves the public five-metric API; GitHub Actions runs tests and monthly artifacts."),
             ("Privacy", "Role scope is applied before queries return. Small groups, employee identifiers and client rows are excluded from release views."),
             ("Decision support", "M29 shows what share of open receivables is already overdue, complementing DSO and the absolute past-due balance."),
         ], width=170),
@@ -181,7 +182,7 @@ def build_phase4():
             ("What was learned", "A release is more than charts: calculations need ownership, freshness, privacy, reproducibility, deployment evidence and an honest operating boundary."),
         ], width=170),
         Spacer(1, 5),
-        p("Next phase plan: connect a changing source feed, deploy the API blueprint in the selected hosting account, observe the first scheduled production run, and add actual months so forecast accuracy becomes measurable.", "SmallR"),
+        p("Next phase plan: connect a changing source feed, observe the first scheduled production run, and add actual months so forecast accuracy becomes measurable. Before submission, capture the physical-phone/viewer evidence and personal demo link.", "SmallR"),
     ]
     doc.build(story, onFirstPage=footer("PulseIQ Phase 4 · Aditya Mergurwar", 3), onLaterPages=footer("PulseIQ Phase 4 · Aditya Mergurwar", 3))
     return PHASE4
@@ -211,7 +212,7 @@ def build_consolidated():
     s = []
     report_page(s, "DATA ANALYTICS TRACK · FINAL RELEASE", "PulseIQ", "A governed workforce, delivery and finance analytics product for Zenith Nova Technologies' fictional training data.")
     s += [Spacer(1, 18), p("From supplied rows to board decisions", "QuoteR"), Spacer(1, 12),
-          info_cards([("Repository", link("github.com/adityamergurwar/pulseiq", REPO)), ("Live dashboard", link("pulseiq-workforce.streamlit.app", APP)), ("Release", link("phase-4 · v1.0.0", TAG)), ("Board pack", "Nine slides · September 2026")], width=170), Spacer(1, 18),
+          info_cards([("Repository", link("github.com/adityamergurwar/pulseiq", REPO)), ("Live dashboard", link("pulseiq-workforce.streamlit.app", APP)), ("Live metrics API", link("pulseiq-metrics-api-fezs.onrender.com", API)), ("Release", link("phase-4 · v1.0.0", TAG))], width=170), Spacer(1, 18),
           stat_row([("29", "governed metrics"), ("12", "analytics pages"), ("29 / 29", "tests pass"), ("0", "declared orphans"), ("18 / 18", "finance months tie")]), Spacer(1, 12),
           p("Build scope: reproducible data pipeline, data quality, workforce and people analytics, team delivery, payroll and budget, P&L and cash, AI review signals, executive scorecard, role-aware exploration, API, scheduled reporting and board release artifacts.", "BodyR"),
           PageBreak()]
@@ -222,8 +223,8 @@ def build_consolidated():
 
     report_page(s, "2 · ARCHITECTURE", "How the build is governed", "Each product reads controlled views instead of repeating calculations inside charts.")
     s += [module_table(), Spacer(1, 10),
-          info_cards([("Raw evidence", "Source values are never overwritten. Invalid records keep their source table, row number and reason."), ("Conformed truth", "Documented SCD and ledger corrections are recorded in audit tables; facts join employee history through employee_key."), ("Metric contract", "M01-M29 share a dictionary/catalog. The dashboard, API and reports consume the same governed calculations."), ("Release path", "Pinned runtime → tests → validation → packs → tagged commit → scheduled refresh and hosted products.")], width=170), Spacer(1, 10),
-          p("Core relationship: source CSV → raw → clean/quarantine → warehouse → governed metric → dashboard/API/report. This separation keeps evidence, calculation and presentation independently testable.", "BodyR"), PageBreak()]
+          info_cards([("Raw evidence", "Source values are never overwritten. Invalid records keep their source table, row number and reason."), ("Conformed truth", "Documented SCD and ledger corrections are recorded in audit tables; facts join employee history through employee_key."), ("Metric contract", "M01-M29 share a dictionary/catalog. The dashboard, API and reports consume the same governed calculations."), ("Release path", "Pinned runtime to tests to validation to packs to tagged commit, scheduled refresh and hosted products.")], width=170), Spacer(1, 10),
+          p("Core relationship: source CSV to raw to clean/quarantine to warehouse to governed metric to dashboard/API/report. This separation keeps evidence, calculation and presentation independently testable.", "BodyR"), PageBreak()]
 
     report_page(s, "3 · PHASE 1", "Foundation: contracts, warehouse and first dashboard", "The first release established repeatable ingestion, traceable quality controls and reusable metrics.")
     s += [two_pictures(ROOT / "output/evidence/PulseIQ_Live_Dashboard_2026-10-22.png", "Published Streamlit dashboard evidence.", ROOT / "output/evidence/PulseIQ_Attendance_Leave_2026-09.png", "Attendance view built from scheduled working-day denominators."), Spacer(1, 7),
@@ -239,7 +240,7 @@ def build_consolidated():
 
     report_page(s, "6 · PHASE 4", "Release engineering and controlled exploration", "The final phase turns a working analysis into a repeatable, deployable and reviewable product.")
     s += [two_pictures(ROOT / "output/evidence/phase4/board_snapshot.png", "Board snapshot with workforce, profit, cash and collections signals.", ROOT / "output/evidence/phase4/board_quality.png", "Quality and release guardrails included in the board narrative."), Spacer(1, 7),
-          info_cards([("Automation", "Exact pins, Python 3.11 workflow, manual/monthly triggers and versioned report artifacts."), ("Explorer", "ADMIN, HR, MANAGER and EXECUTIVE scopes; company/department/team drill-down where supported."), ("API", "Five metrics return value, definition, source, freshness and privacy through FastAPI/OpenAPI."), ("Challenge", "M29 overdue share was built on its own branch, tested independently and merged into release.")], width=170), PageBreak()]
+          info_cards([("Automation", "Exact pins, Python 3.11 workflow, manual/monthly triggers and versioned report artifacts."), ("Explorer", "ADMIN, HR, MANAGER and EXECUTIVE scopes; company/department/team drill-down where supported."), ("API", f"Five metrics return value, definition, source, freshness and privacy through the {link('public FastAPI service', API)}."), ("Challenge", "M29 overdue share was built on its own branch, tested independently and merged into release.")], width=170), PageBreak()]
 
     report_page(s, "7 · ONE NUMBER", "Trace and prove M29 overdue receivables share", "A complete lineage explanation from first row to governed chart.")
     s += [info_cards([("Raw", "Invoice INV rows provide due date and total; linked payment rows provide dated receipts."), ("Clean", "Valid invoice/payment rows retain numeric values. Draft and cancelled invoices are excluded."), ("As of date", "Receipts through month end reduce invoice totals; positive balances remain open."), ("Metric", "100 × overdue open balance ÷ total open balance in metrics.m29_overdue_receivables_share."), ("Explorer", "Catalog entry exposes the company result to ADMIN and EXECUTIVE; no client row is returned.")], width=138), Spacer(1, 10),
@@ -254,8 +255,8 @@ def build_consolidated():
 
     report_page(s, "9 · BOARD HANDOFF", "Decisions, limits and next release", "The board pack and demo script present the evidence without overstating forecasts or automation.")
     s += [two_pictures(ROOT / "output/evidence/phase4/board_actions.png", "Three owned actions: collections, people/capacity and governance.", ROOT / "output/evidence/phase3/forecasts_anomalies.png", "Anomaly and forecast outputs are explicitly labelled for human review."), Spacer(1, 7),
-          info_cards([("Immediate", "Review the overdue book, D01 cost/capacity, attendance outliers and high-value anomaly types."), ("Operational", "Connect a changing source feed, observe the first scheduled run and deploy the API blueprint."), ("Measurement", "Add actual periods overlapping the forecast horizon before calculating forecast error."), ("Owner actions", "Record the face-and-screen demonstration and upload the final PDF through the programme form.")], width=170), Spacer(1, 7),
-          p(f"Artifacts: {link('public repository', REPO)} · {link('live dashboard', APP)} · board pack `output/pptx/PulseIQ_Board_Pack_September_2026.pptx` · Phase 4 validation `docs/phase4_validation.md` · demo guide `docs/board_demo_script.md`.", "BodyR")]
+          info_cards([("Immediate", "Review the overdue book, D01 cost/capacity, attendance outliers and high-value anomaly types."), ("Operational", "Connect a changing source feed and observe the first scheduled production run."), ("Measurement", "Add actual periods overlapping the forecast horizon before calculating forecast error."), ("Owner actions", "Capture the physical-phone/viewer proof, record the face-and-screen demonstration and upload the final PDF.")], width=170), Spacer(1, 7),
+          p(f"Artifacts: {link('public repository', REPO)} · {link('live dashboard', APP)} · {link('live metrics API', API)} · board pack `output/pptx/PulseIQ_Board_Pack_September_2026.pptx` · Phase 4 validation `docs/phase4_validation.md` · demo guide `docs/board_demo_script.md`.", "BodyR")]
 
     doc.build(s, onFirstPage=footer("PulseIQ consolidated report · Aditya Mergurwar", 10), onLaterPages=footer("PulseIQ consolidated report · Aditya Mergurwar", 10))
     return CONSOLIDATED

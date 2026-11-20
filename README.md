@@ -35,7 +35,7 @@ uvicorn pulseiq.api:app --host 127.0.0.1 --port 8000
 
 The OpenAPI UI is at `http://127.0.0.1:8000/docs`. The API exposes M01, M04, M09, M20 and M22 with definitions, lineage, data cutoff and privacy metadata.
 
-The dashboard is live at [pulseiq-workforce.streamlit.app](https://pulseiq-workforce.streamlit.app). The API is deployment-ready through `render.yaml` and `Dockerfile.api`; see [API deployment and examples](docs/api.md).
+The dashboard is live at [pulseiq-workforce.streamlit.app](https://pulseiq-workforce.streamlit.app). The governed metrics API is live at [pulseiq-metrics-api-fezs.onrender.com](https://pulseiq-metrics-api-fezs.onrender.com), with interactive documentation at [/docs](https://pulseiq-metrics-api-fezs.onrender.com/docs). Deployment files remain versioned in `render.yaml` and `Dockerfile.api`; see [API deployment and examples](docs/api.md).
 
 ## Dashboards
 
@@ -113,6 +113,7 @@ Both packs default to the latest observed workforce month when `--month` is omit
 - [Board demo script](docs/board_demo_script.md)
 - [Phase 4 validation](docs/phase4_validation.md)
 - [API guide](docs/api.md)
+- [External release validation](docs/external_release_validation.md)
 - [Release notes](RELEASE_NOTES.md)
 
 ## Local deliverables
@@ -129,4 +130,4 @@ Both packs default to the latest observed workforce month when `--month` is omit
 
 ## Release status
 
-The [public pulseiq repository](https://github.com/adityamergurwar/pulseiq) contains all four phases. The Streamlit dashboard is deployed at [pulseiq-workforce.streamlit.app](https://pulseiq-workforce.streamlit.app). The `v1.0.0`, `phase-4` and release-candidate tags identify the final and pre-release checkpoints. The fixed training snapshot ends on 2026-09-30; scheduled refreshes rebuild and validate the supplied data but require a new source feed to advance the cutoff. See the [acceptance matrix](docs/task_acceptance_matrix.md) and [deployment runbook](docs/deployment.md) for exact evidence.
+The [public pulseiq repository](https://github.com/adityamergurwar/pulseiq) contains all four phases. The Streamlit dashboard is deployed at [pulseiq-workforce.streamlit.app](https://pulseiq-workforce.streamlit.app), and the five-metric FastAPI service is deployed at [pulseiq-metrics-api-fezs.onrender.com](https://pulseiq-metrics-api-fezs.onrender.com). The `v1.0.0`, `phase-4` and release-candidate tags identify the final and pre-release checkpoints. The fixed training snapshot ends on 2026-09-30; scheduled refreshes rebuild and validate the supplied data but require a new source feed to advance the cutoff. See the [acceptance matrix](docs/task_acceptance_matrix.md), [external release validation](docs/external_release_validation.md) and [deployment runbook](docs/deployment.md) for exact evidence.

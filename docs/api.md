@@ -2,6 +2,15 @@
 
 The FastAPI service exposes five governed, aggregate metrics. It returns the value, dictionary definition, formula, source, owner, data cutoff, last successful refresh and privacy statement. It does not expose employee rows.
 
+## Public deployment
+
+- Service: [pulseiq-metrics-api-fezs.onrender.com](https://pulseiq-metrics-api-fezs.onrender.com)
+- Health: [GET /health](https://pulseiq-metrics-api-fezs.onrender.com/health)
+- Metric catalog: [GET /api/metrics](https://pulseiq-metrics-api-fezs.onrender.com/api/metrics)
+- Interactive OpenAPI: [/docs](https://pulseiq-metrics-api-fezs.onrender.com/docs)
+
+The Render free service may need a short cold-start delay after inactivity. The public release was checked on 19 November 2026: health returned HTTP 200, the catalog listed all five metrics, and M01, M04, M09, M20 and M22 returned governed September 2026 results with definitions, source, cutoff and freshness metadata.
+
 ## Start locally
 
 ```powershell
@@ -24,6 +33,7 @@ The exposed metric IDs are M01 headcount, M04 monthly attrition, M09 employer pa
 ```powershell
 curl "http://127.0.0.1:8000/api/metrics/M01?period=2026-09&department_id=ALL"
 curl "http://127.0.0.1:8000/api/metrics/M20?period=2026-09&department_id=ALL"
+curl "https://pulseiq-metrics-api-fezs.onrender.com/api/metrics/M01?period=2026-09&department_id=ALL"
 ```
 
 An M01 response includes this contract:
