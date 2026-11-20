@@ -5,6 +5,7 @@ The FastAPI service exposes five governed, aggregate metrics. It returns the val
 ## Public deployment
 
 - Service: [pulseiq-metrics-api-fezs.onrender.com](https://pulseiq-metrics-api-fezs.onrender.com)
+- Base URL: redirects browser visitors to the interactive OpenAPI documentation
 - Health: [GET /health](https://pulseiq-metrics-api-fezs.onrender.com/health)
 - Metric catalog: [GET /api/metrics](https://pulseiq-metrics-api-fezs.onrender.com/api/metrics)
 - Interactive OpenAPI: [/docs](https://pulseiq-metrics-api-fezs.onrender.com/docs)

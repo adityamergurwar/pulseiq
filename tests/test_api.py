@@ -1,10 +1,15 @@
 import unittest
 from fastapi import HTTPException
 
-from pulseiq.api import API_METRICS, app, get_metric, list_metrics
+from pulseiq.api import API_METRICS, app, get_metric, list_metrics, root
 
 
 class AnalyticsApiTests(unittest.TestCase):
+    def test_root_redirects_browser_visitors_to_docs(self):
+        response=root()
+        self.assertEqual(response.status_code,307)
+        self.assertEqual(response.headers["location"],"/docs")
+
     def test_openapi_contains_five_governed_metrics(self):
         self.assertEqual(set(API_METRICS),{"M01","M04","M09","M20","M22"})
         schema=app.openapi()

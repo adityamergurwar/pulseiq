@@ -14,6 +14,7 @@ from typing import Any
 
 import duckdb
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from fastapi.responses import RedirectResponse
 
 from .app_common import DB_PATH, ROOT
 
@@ -30,6 +31,12 @@ app = FastAPI(
     version="1.0.0",
     description="Read-only aggregates from the governed PulseIQ metric layer. No employee-level endpoints are exposed.",
 )
+
+
+@app.get("/", include_in_schema=False)
+def root() -> RedirectResponse:
+    """Send browser visitors to the interactive API documentation."""
+    return RedirectResponse(url="/docs", status_code=307)
 
 
 def _connect():
